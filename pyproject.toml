@@ -1,7 +1,7 @@
 [project]
 name = "agentflow"
 version = "0.1.2"
-description = "Agent Flow is the absolute trainer to light up AI agents."
+description = "AgentFlow is a trainable, in-the-flow agentic framework."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
