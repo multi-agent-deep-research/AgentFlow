@@ -2,9 +2,8 @@ PLEASE CHANGE THE ARXIV, REPO, AND OTEHR URL in `agentflow/pyproject.toml`
 
 # AgentFlow: In-The-Flow Agentic System Optimization for Effective Planning and Tool Use.
 
-## Setup
-### Installation
-please revise the project path in `setup.sh`, if you are not currently at the root of the project, and then run: 
+## Installation
+please revise the project path in `setup.sh`, if you are not currently at the root of the project, and then run:
 
 ```bash
 bash setup.sh
@@ -20,7 +19,7 @@ Make .env file, and set `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_CX`, etc. Fo
 
 # Used for LLM-powered modules and tools
 OPENAI_API_KEY=<your-api-key-here> # If you want to use OpenAI LLM
-GOOGLE_API_KEY=<your-api-key-here> # If you want to use Gemini LLM
+DASHSCOPE_API_KEY=<your-api-key-here> # If you want to use Gemini LLM
 
 # Used for the Google Search tool
 GOOGLE_API_KEY=<your-api-key-here>
@@ -33,20 +32,17 @@ XAI_API_KEY=<your-api-key-here> # If you want to use Grok LLM
 ANTHROPIC_API_KEY=<your-api-key-here> # If you want to use Anthropic LLM
 ```
 
-### Data Fetch
+## Quick Start
+### Dataset Preparation
 Please run the following commands to fetch the data:
-
-Train data:
 ```bash
+# train data
 python data/get_train_data.py
-```
-
-Validation data while training:
-```bash
+# validation data
 python data/aime24_data.py
 ```
 
-After running these commands, your data directory structure will be:
+The data dir should be:
 ```
 data/
 ├── train/
@@ -54,9 +50,30 @@ data/
 ├── val/
 │   └── aime24.parquet (30 samples)
 ├── aime24_data.py
-├── check_parquet.py
 └── get_train_data.py
 ```
+### Train
+**Start training with tmux:**
+```bash
+# Create tmux session and start agentflow service (Window 0)
+tmux new-session -s agentflow
+bash train/serve_with_logs.sh
+
+# Create new window (Ctrl+B then C) and start training (Window 1)
+bash train/train_with_logs.sh
+```
+**Configuration:**
+All training hyperparameters are in `train/config.yaml` (model settings, tools, PPO parameters, resources, etc.)
+
+
+
+
+
+
+
+
+
+
 
 ## Test your env before going on
 
