@@ -3,25 +3,15 @@ PLEASE CHANGE THE ARXIV, REPO, AND OTEHR URL in `agentflow/pyproject.toml`
 # AgentFlow: In-The-Flow Agentic System Optimization for Effective Planning and Tool Use.
 
 ## Setup
-### Env Setup
+### Installation
 please revise the project path in `setup.sh`, if you are not currently at the root of the project, and then run: 
 
 ```bash
 bash setup.sh
-```
-
-(Optional) Install `parallel` for running benchmark experiments in parallel:
-
-```sh
+source .venv/bin/activate
+# (Optional) Install `parallel` for running benchmark experiments in parallel:
 sudo apt-get update
 sudo apt-get install parallel
-```
-
-wait for process then your uv venv will satisfy the requirements.
-
-Activate the virtual environment:
-```bash
-source .venv/bin/activate
 ```
 
 Make .env file, and set `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_CX`, etc. For example:
