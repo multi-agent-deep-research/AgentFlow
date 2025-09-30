@@ -24,7 +24,6 @@
 
 models=(
     # "checkpoints/.../actor/huggingface"
-    "IPF/AgentFlow-3B"
     "IPF/AgentFlow-7B"
     # "TIGER-Lab/General-Reasoner-Qwen2.5-7B"
     # "hkust-nlp/Qwen-2.5-7B-SimpleRL-Zoo"
@@ -37,7 +36,6 @@ models=(
 # Available GPU groups (each group uses 2 GPUs)
 gpu_groups=(
     "0"
-    "1"
     # "2"
     # "0,1,2,3"
     # "2,3"
