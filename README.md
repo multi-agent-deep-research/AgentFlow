@@ -100,6 +100,9 @@ bash train/serve_with_logs.sh
 # Create new window (Ctrl+B then C) and start training (Window 1)
 bash train/train_with_logs.sh
 ```
+
+We also provide a comprehensive logging guide to monitor training. See [logs.md](assets/doc/logs.md) for more details.
+
 **Configuration:**
 All training hyperparameters are in [`train/config.yaml`](train/config.yaml) (model settings, tools, RL parameters, resources, etc.)
 
@@ -115,9 +118,10 @@ cd test
 bash exp/run_all_models_all_datasets.sh
 ```
 
+You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md). 
+
 ## Use your own model in AgentFlow 
-+ Planner 
-+ 其他 model 应该怎么修改 
+
 
 
 ## Core Contributors

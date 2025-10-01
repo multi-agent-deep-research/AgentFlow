@@ -1,5 +1,7 @@
 ## Training Logs and Outputs
 
+We provide comprehensive logs to monitor training. 
+
 ### Training Logs
 
 During training, training output logs are automatically saved with IP-based organization:
