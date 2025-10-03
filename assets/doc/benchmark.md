@@ -116,7 +116,7 @@ After benchmark completion, results are organized in the following structure:
 
 ```
 test/
-└── {TASK_NAME}/              # e.g., aime24, gameof24, bamboogle
+└── {TASK_NAME}/              # e.g., aime24, bamboogle
     ├── logs/
     │   └── {MODEL_LABEL}/     # e.g., AgentFlow-7B
     │       ├── 0.log          # Per-problem execution logs
@@ -124,7 +124,7 @@ test/
     │       └── ...
     ├── results/
     │   └── {MODEL_LABEL}/
-    │       ├── final_results_direct_output.json    # Detailed per-problem analysis
+    │       ├── final_results_direct_output.json    # Per-problem analysis
     │       ├── final_scores_direct_output.json    # Aggregate metrics
     │       ├── final_score_direct_output.log       # Scoring process log
     │       ├── output_0.json                      # Individual outputs

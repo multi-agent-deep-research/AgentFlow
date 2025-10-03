@@ -63,9 +63,18 @@ sudo apt-get install parallel
 ```
 
 ### Setup Environment Variables
-Duplicate the `.env.template` file and rename it to `.env`. Next, update the variables (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DASHSCOPE_API_KEY`) with your own keys. Please check [API Key Setup Guide](assets/doc/api_key.md) for more details on how to obtain these keys. 
-```
-cp .env_template .env
+Copy the `.env.template` file from `agentflow/.env.template` and rename it to `.env`, then place it in the `agentflow/` folder. Update the following variables with your own API keys:
+- `OPENAI_API_KEY` (used for RAG summary in tools)
+- `GOOGLE_API_KEY` (for Google Search tool)
+- `DASHSCOPE_API_KEY` (for calling Qwen-2.5-7B-Instruct - recommended for China/Singapore users)
+- `TOGETHER_API_KEY` (alternative for calling Qwen-2.5-7B-Instruct - recommended for international users)
+- More ways: serve qwen2.5-7B-instruct model with vLLM (details refer to [`serve_vllm_local.md`](assets/doc/serve_vllm_local.md)).
+
+Please check [API Key Setup Guide](assets/doc/api_key.md) for detailed instructions on how to obtain these keys.
+
+```bash
+cp agentflow/.env.template agentflow/.env
+# Then edit agentflow/.env with your API keys
 ```
 
 ## Quick Start
@@ -73,6 +82,8 @@ cp .env_template .env
 Before diving in, we recommend verifying that AgentFlow's tools, LLM engines, and network configuration are properly set up. See [test_env.md](assets/doc/test_env.md) for detailed testing instructions.
 
 ### Dataset Preparation
+We mix two datasets for training: [NQ (Natural Questions)](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets) for search tasks and [DeepMath-103K](https://huggingface.co/datasets/zwhe99/DeepMath-103K) for mathematical reasoning.
+
 ```bash
 # train data
 python data/get_train_data.py
@@ -90,7 +101,22 @@ data/
 ├── aime24_data.py
 └── get_train_data.py
 ```
-### Flow-GRPO Training
+
+### AgentFlow Inference
+Serve the trained planner model with VLLM (here we deploy our [7B Flow-GRPO planner model](agentflow/AgentFlow-Planner-7B)):
+```bash
+bash scripts/serve_vllm.sh
+```
+
+Run inference on benchmark tasks:
+```bash
+cd test
+bash exp/run_all_models_all_datasets.sh
+```
+
+You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md). 
+
+### Train with Flow-GRPO
 Start agentflow training using Flow-GRPO with tmux:
 ```bash
 # Create tmux session and start agentflow service (Window 0)
@@ -106,19 +132,6 @@ We provide a comprehensive logging to monitor training. See [logs.md](assets/doc
 **Configuration:**
 All training hyperparameters are in [`train/config.yaml`](train/config.yaml) (model settings, tools, RL parameters, resources, etc.)
 
-### AgentFlow Inference
-Serve the trained planner model with VLLM (here we deploy our [7B Flow-GRPO planner model](agentflow/AgentFlow-Planner-7B)):
-```bash
-bash scripts/serve_vllm.sh
-```
-
-Run inference on benchmark tasks:
-```bash
-cd test
-bash exp/run_all_models_all_datasets.sh
-```
-
-You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md). 
 
 ## Use Your Own Model in AgentFlow
 
