@@ -23,36 +23,50 @@ AgentFlow: In-The-Flow Agentic System Optimization for Effective Planning and To
 |
 </p>
 
-AgentFlow is a trainable, tool-integrated agentic framework that addresses the scalability and generalization limitations of current tool-integrated reasoning approaches. 
+## 🌟 Why AgentFlow?
+AgentFlow is a **trainable, tool-integrated agentic framework** designed to overcome the **scalability** and **generalization limits** of today’s tool-augmented reasoning approaches.  
 
-Unlike prevailing methods, like Search-R1 that train a single LLM interleaving thoughts and tool calls, AgentFlow provides a modular agentic system with four specialized modules (planner, executor, verifier, generator) that coordinate through evolving memory and a toolkit over multiple turns to solve complex reasoning tasks.
+Unlike prevailing approaches such as [Search-R1](https://github.com/PeterGriffinJin/Search-R1) which train a **single LLM** to interleave reasoning steps with tool calls, **AgentFlow** introduces a **modular agentic system** with four specialized modules: 🧭 **Planner**, 🛠 **Executor**, ✅ **Verifier**, and ✍️ **Generator**.
 
 ![framework_overall](assets/img/framework.png)
 
-For effective planning and tool use, the framework directly optimizes the planner agent within the system in an online fashion using Flow-based Group Refined Policy Optimization (Flow-GRPO), achieving superior performance across diverse domains with improved tool-calling reliability and long-horizon reasoning capabilities.
+For effective planning and tool use, the framework directly optimizes **planner agent** within the system in an **online fashion** using **Flow-based Group Refined Policy Optimization (Flow-GRPO)**, achieving superior performance across diverse domains with improved tool-calling reliability and long-horizon reasoning capabilities.
 
 ![flow_grpo](assets/img/flow_grpo.png)
 
-## Key Features
-+ **Modular Agentic System**: Powerful Agentic System with four specialized modules (planner, executor, verifier, generator) augmented with tools that coordinate through evolving memory across multiple turns.
-+ **Multi-Tool Integration**: Seamless integration with diverse tool ecosystems, including base_generator, python_coder, google_search, wikipedia_search, and web_search.
-+ **Flow-GRPO Algorithm**: Novel Flow-based Group Refined Policy Optimization that enables in-the-flow optimization within agentic systems under long-horizon reasoning tasks with sparse reward.
+## 🚀 Key Features
 
-## Experiments
-### Main results
-Through comprehensive experiments on ten benchmarks, AgentFlow with a 7B-scale backbone (Qwen-2.5-7B-Instruct) outperforms top-performing baselines with average accuracy gains of 14.9% on search, 14.0% on agentic, 14.5% on mathematical, and 4.1% on scientific tasks. Notably, our 7B-backbone system even surpasses the ∼200B-parameter GPT-4o. 
+- 🧩 **Modular Agentic System** – Four specialized agent modules (**Planner**, **Executor**, **Verifier**, **Generator**) that coordinate via evolving memory and integrated tools across multiple turns.  
+- 🔗 **Multi-Tool Integration** – Seamlessly connect with diverse tool ecosystems, including **base_generator**, **python_coder**, **google_search**, **wikipedia_search**, **web_search**, and more.  
+- 🎯 **Flow-GRPO Algorithm** – Enables **in-the-flow agent optimization** for **long-horizon reasoning tasks** with sparse rewards.
+- 📈 **Proven Results** – **AgentFlow (7B Backbone)** beats top baselines on 10 benchmarks, with **+14.9% search**, **+14.0% agentic**, **+14.5% math**, **+4.1% science**, even **outperforming GPT-4o**.
+
+## 🏆 Experiments
+
+### 📊 Main Results
+**AgentFlow (Qwen-2.5-7B-Instruct Backbone)** outperforms top baselines on 10 benchmarks:  
+- **+14.9%** on search  
+- **+14.0%** on agentic reasoning  
+- **+14.5%** on math  
+- **+4.1%** on science  
+
+💡 Even surpasses larger proprietary models like **GPT-4o (~200B)**.
 
 ![main_table](assets/img/main_table.png)
 
-### In-depth analysis
-Further analyses confirm the benefits of in-the-flow optimization,
-demonstrating improved planning, enhanced tool-calling reliability, and positive
-scaling trends with model size and reasoning turns. Please explore more findings at our paper or the project page.
+### 🔍 In-Depth Analysis
+- Improved planning and decision-making  
+- Enhanced tool-calling reliability  
+- Positive scaling trends with model size & reasoning turns  
+
+Explore more in our [paper](#) or [project page](https://agentflow.stanford.edu/).
 
 ![tool_call](assets/img/tool_call.png)
 
+---
 
-## Setup
+
+## ⚙️ Setup
 ### Installation
 ```bash
 bash setup.sh
@@ -64,11 +78,11 @@ sudo apt-get install parallel
 
 ### Setup Environment Variables
 Copy the `.env.template` file from `agentflow/.env.template` and rename it to `.env`, then place it in the `agentflow/` folder. Update the following variables with your own API keys:
-- `OPENAI_API_KEY` (used for RAG summary in tools)
+- `OPENAI_API_KEY` (for judging reasponse)
 - `GOOGLE_API_KEY` (for Google Search tool)
-- `DASHSCOPE_API_KEY` (for calling Qwen-2.5-7B-Instruct - recommended for China/Singapore users)
+- `DASHSCOPE_API_KEY` (for calling Qwen-2.5-7B-Instruct as engine for agents and tools - recommended for China/Singapore users)
 - `TOGETHER_API_KEY` (alternative for calling Qwen-2.5-7B-Instruct - recommended for international users)
-- More ways: serve qwen2.5-7B-instruct model with vLLM (details refer to [`serve_vllm_local.md`](assets/doc/serve_vllm_local.md)).
+- More ways: serve Qwen2.5-7B-instruct model with vLLM (details refer to [`serve_vllm_local.md`](assets/doc/serve_vllm_local.md)).
 
 Please check [API Key Setup Guide](assets/doc/api_key.md) for detailed instructions on how to obtain these keys.
 
@@ -77,12 +91,38 @@ cp agentflow/.env.template agentflow/.env
 # Then edit agentflow/.env with your API keys
 ```
 
-## Quick Start
+## ⚡ Quick Start on AgentFlow Inference 
+AgentFlow provides a modular agentic system with four specialized modules (planner, executor, verifier, generator) that coordinate through evolving memory and a toolkit over multiple turns to solve complex reasoning tasks. 
+
+To quickly experience the system in action, run the command below (don’t forget to set up your API key):
+```python 
+python quick_start.py
+```
+Here is the content of `quick_start.py`:
+```python
+# Import the solver
+from agentflow.agentflow.solver import construct_solver
+
+# Set the LLM engine name
+llm_engine_name = "dashscope"
+
+# Construct the solver
+solver = construct_solver(llm_engine_name=llm_engine_name)
+
+# Solve the user query
+output = solver.solve("What is the capital of France?")
+print(output["direct_output"])
+```
+
+## ⚡ Quick Start on AgentFlow Flow-GRPO Training 
+For effective planning and tool use, the framework directly optimizes the planner agent within the system in an online fashion using Flow-GRPO. Below is a quick start for training.
+
 ### (Optional) Test Your Environment
 Before diving in, we recommend verifying that AgentFlow's tools, LLM engines, and network configuration are properly set up. See [test_env.md](assets/doc/test_env.md) for detailed testing instructions.
 
+
 ### Dataset Preparation
-We mix two datasets for training: [NQ (Natural Questions)](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets) for search tasks and [DeepMath-103K](https://huggingface.co/datasets/zwhe99/DeepMath-103K) for mathematical reasoning.
+We mix two datasets for training: [NQ (Natural Questions)](https://huggingface.co/datasets/RUC-NLPIR/FlashRAG_datasets) for agentic search and [DeepMath-103K](https://huggingface.co/datasets/zwhe99/DeepMath-103K) for mathematical reasoning.
 
 ```bash
 # train data
@@ -102,7 +142,26 @@ data/
 └── get_train_data.py
 ```
 
-### AgentFlow Inference
+### Flow-GRPO Training 
+Start agentflow training using Flow-GRPO with tmux:
+```bash
+# Create tmux session and start agentflow service (Window 0)
+tmux new-session -s agentflow
+bash train/serve_with_logs.sh
+
+# Create new window (Ctrl+B then C) and start training (Window 1)
+bash train/train_with_logs.sh
+```
+
+**Configuration:**
+All training hyperparameters are in [`train/config.yaml`](train/config.yaml) (model settings, tools, RL parameters, resources, etc.)
+
+**Logging:**
+We provide a comprehensive logging to monitor training. See [logs.md](assets/doc/logs.md) for more details.
+
+
+
+### AgentFlow Benchmark 
 Serve the trained planner model with VLLM (here we deploy our [7B Flow-GRPO planner model](agentflow/AgentFlow-Planner-7B)):
 ```bash
 bash scripts/serve_vllm.sh
@@ -144,24 +203,6 @@ executor = Executor(
 )
 ```
 - For detailed information on supported engines and `model_string` formats, see [`llm_engine.md`](assets/doc/llm_engine.md)
-
-
-## Train Your *Action Planner* with Flow-GRPO
-Start agentflow training using Flow-GRPO with tmux:
-```bash
-# Create tmux session and start agentflow service (Window 0)
-tmux new-session -s agentflow
-bash train/serve_with_logs.sh
-
-# Create new window (Ctrl+B then C) and start training (Window 1)
-bash train/train_with_logs.sh
-```
-
-We provide a comprehensive logging to monitor training. See [logs.md](assets/doc/logs.md) for more details.
-
-**Configuration:**
-All training hyperparameters are in [`train/config.yaml`](train/config.yaml) (model settings, tools, RL parameters, resources, etc.)
-
 
 
 
