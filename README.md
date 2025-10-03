@@ -146,6 +146,7 @@ AgentFlow supports different LLM engines for each agent module. See [llm_engine.
 ```python
 self.llm_engine_fixed = create_llm_engine(model_string="your-engine", is_multimodal=False, temperature=temperature)
 ```
+- For detailed information on supported engines and `model_string` formats, see [`llm_engine.md`](assets/doc/llm_engine.md)
 
 ## Core Contributors
 
