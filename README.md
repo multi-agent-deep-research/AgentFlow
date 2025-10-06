@@ -1,5 +1,5 @@
 <h1>
-  <img src="assets/img/logo.png" alt="AgentFlow" width="35" align="left" style="margin-right: 15px;">
+  <img src="assets/img/logo.png" alt="AgentFlow" width="50" align="left" style="margin-right: 15px;">
   AgentFlow
 </h1>
 
