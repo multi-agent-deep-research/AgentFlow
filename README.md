@@ -3,7 +3,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/img/logo.png">
-    <img alt="AgentFlow" src="assets/img/logo.png" width=30%>
+    <img alt="AgentFlow" src="assets/img/logo.png" width=25%>
   </picture>
 </p>
 
@@ -11,17 +11,16 @@
 AgentFlow: In-The-Flow Agentic System Optimization for Effective Planning and Tool Use.
 </h3>
 
-<p align="center">
-| 
-<a href=""><b>Website</b></a> |
-<a href=""><b>Paper</b></a> |
-<a href="https://huggingface.co/AgentFlow"><b>Huggingface</b></a> |
-<a href=""><b>Twitter</b></a> |
-  <a href="https://deepwiki.com/lupantech/AgentFlow"><b>DeepWiki</b></a> |
-  <a href=""><b>WeChat Group</b></a> |
-  <a href="https://join.slack.com/t/agentflowco/shared_invite/zt-3f1bmai74-1CaZfpgkhRU061lYaH4zqQ"><b>Slack</b></a>
-|
-</p>
+
+<!--- BADGES: START --->
+[![Arxiv](https://img.shields.io/badge/arXiv-2502.11271-B31B1B.svg?logo=arxiv)]()
+[![Gradio Demo](https://img.shields.io/badge/Gradio-Demo-F97316.svg?logo=gradio)](https://huggingface.co/spaces/AgentFlow/agentflow)
+[![Huggingface Model](https://img.shields.io/badge/Huggingface-Model-FFD21E.svg?logo=huggingface)](https://huggingface.co/spaces/AgentFlow/agentflow)
+[![Website](https://img.shields.io/badge/Website-AgentFlow-E5426E?logo=kashflow)](https://agentflow.stanford.edu/)
+[![Coverage](https://img.shields.io/badge/Coverage-AgentFlow-2176BC.svg?logo=x)]()
+[![Slack](https://img.shields.io/badge/Slack-AgentFlow-D41544.svg?logo=slack)](https://agentflowco.slack.com/ssb/redirect)
+<!--- BADGES: END --->
+
 
 ## 🌟 Why AgentFlow?
 AgentFlow is a **trainable, tool-integrated agentic framework** designed to overcome the **scalability** and **generalization limits** of today’s tool-augmented reasoning approaches.  
