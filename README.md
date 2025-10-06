@@ -66,6 +66,23 @@ Explore more in our [paper](#) or [project page](https://agentflow.stanford.edu/
 
 ---
 
+## 📑 Table of Contents
+ - [⚙️ Setup](#️-setup)
+  - [Installation](#installation)
+  - [Setup Environment Variables](#setup-environment-variables)
+- [⚡ Quick Start on AgentFlow Inference](#-quick-start-on-agentflow-inference)
+- [💥 Quick Start on AgentFlow Flow-GRPO Training](#-quick-start-on-agentflow-flow-grpo-training)
+  - [(Optional) Test Your Environment](#optional-test-your-environment)
+  - [Dataset Preparation](#dataset-preparation)
+  - [Flow-GRPO Training](#flow-grpo-training)
+  - [AgentFlow Benchmark](#agentflow-benchmark)
+  - [Use Your Own Model in AgentFlow](#use-your-own-model-in-agentflow)
+- [👋 Core Contributors](#-core-contributors)
+- [🎓 Advisors](#-advisors)
+- [🙏 Acknowledgements](#-acknowledgements)
+- [🤝 Contributing](#-contributing)
+- [🚀 Star History](#-star-history)
+- [↑ Back to Top](#readme-top)
 
 ## ⚙️ Setup
 ### Installation
@@ -115,7 +132,7 @@ output = solver.solve("What is the capital of France?")
 print(output["direct_output"])
 ```
 
-## ⚡ Quick Start on AgentFlow Flow-GRPO Training 
+## 💥 Quick Start on AgentFlow Flow-GRPO Training 
 For effective planning and tool use, the framework directly **optimizes the planner agent within the system in an online fashion using Flow-GRPO**. Below is a quick start for training.
 
 ### (Optional) Test Your Environment
@@ -207,7 +224,7 @@ executor = Executor(
 
 
 
-## Core Contributors
+## 👋 Core Contributors
 
 <table>
 <tr>
@@ -235,7 +252,7 @@ executor = Executor(
 </tr>
 </table>
 
-## Advisors
+## 🎓 Advisors
 
 <table>
 <tr>
@@ -263,7 +280,7 @@ executor = Executor(
 </tr>
 </table>
 
-## Acknowledgements
+## 🙏 Acknowledgements
 
 We thank the following open-source projects:
 - [verl](https://github.com/volcengine/verl) for the excellent RL framework design.
@@ -272,14 +289,14 @@ We thank the following open-source projects:
 
 We thank [Lambda](https://lambda.ai/careers) for GPU support!
 
-## Contributors
+## 🤝 Contributing
 
 We are truly looking forward to open-source contributions to AgentFlow!  If you’re interested in contributing, collaborating, or reporting issues, please feel free to open an issue or submit a pull request (PR).  You can also reach us at [zhuofengli12345@gmail.com](mailto:zhuofengli12345@gmail.com) or join our Slack community: [AgentFlow](https://join.slack.com/t/agentflowco/shared_invite/zt-3f1bmai74-1CaZfpgkhRU061lYaH4zqQ).
 
 
 We are also looking forward to your feedback and suggestions!
 
-## Star History
+## 🚀 Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=lupantech/AgentFlow&type=Date)](https://www.star-history.com/#lupantech/AgentFlow&Date)
 
