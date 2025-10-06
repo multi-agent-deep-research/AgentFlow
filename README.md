@@ -31,7 +31,7 @@ Unlike prevailing approaches such as [Search-R1](https://github.com/PeterGriffin
 
 ![framework_overall](assets/img/framework.png)
 
-For effective planning and tool use, the framework directly optimizes **planner agent** within the system in an **online fashion** using **Flow-based Group Refined Policy Optimization (Flow-GRPO)**, achieving superior performance across diverse domains with improved tool-calling reliability and long-horizon reasoning capabilities.
+For effective planning and tool use, the framework directly **optimizes planner agent within the system** in an **online fashion** using **Flow-based Group Refined Policy Optimization (Flow-GRPO)**, achieving superior performance across diverse domains with improved tool-calling reliability and long-horizon reasoning capabilities.
 
 ![flow_grpo](assets/img/flow_grpo.png)
 
@@ -93,7 +93,7 @@ cp agentflow/.env.template agentflow/.env
 ```
 
 ## ⚡ Quick Start on AgentFlow Inference 
-AgentFlow provides a modular agentic system with four specialized modules (planner, executor, verifier, generator) that coordinate through evolving memory and a toolkit over multiple turns to solve complex reasoning tasks. 
+AgentFlow provides a modular agentic system with **four specialized modules** (planner, executor, verifier, generator) that coordinate through **evolving memory** and a **toolkit** over **multiple turns** to solve complex reasoning tasks. 
 
 To quickly experience the system in action, run the command below (don’t forget to set up your API key):
 ```python 
@@ -116,7 +116,7 @@ print(output["direct_output"])
 ```
 
 ## ⚡ Quick Start on AgentFlow Flow-GRPO Training 
-For effective planning and tool use, the framework directly optimizes the planner agent within the system in an online fashion using Flow-GRPO. Below is a quick start for training.
+For effective planning and tool use, the framework directly **optimizes the planner agent within the system in an online fashion using Flow-GRPO**. Below is a quick start for training.
 
 ### (Optional) Test Your Environment
 Before diving in, we recommend verifying that AgentFlow's tools, LLM engines, and network configuration are properly set up. See [test_env.md](assets/doc/test_env.md) for detailed testing instructions.
