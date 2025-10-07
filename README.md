@@ -1,14 +1,14 @@
-# AgentFlow 
+<a name="readme-top"></a>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/img/logo.png">
-    <img alt="AgentFlow" src="assets/img/logo.png" width=25%>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/img/logo.svg">
+    <img alt="AgentFlow" src="assets/img/logo.svg" width=25%>
   </picture>
 </p>
 
 <h3 align="center">
-AgentFlow: In-The-Flow Agentic System Optimization for Effective Planning and Tool Use.
+AgentFlow: In-the-Flow Agentic System Optimization for Effective Planning and Tool Use
 </h3>
 
 
@@ -18,7 +18,7 @@ AgentFlow: In-The-Flow Agentic System Optimization for Effective Planning and To
     <a href="https://huggingface.co/spaces/AgentFlow/agentflow"><img src="https://img.shields.io/badge/Gradio-Demo-F97316.svg?logo=gradio" alt="Gradio Demo"></a>
     <a href="https://huggingface.co/AgentFlow"><img src="https://img.shields.io/badge/Huggingface-Model-FFD21E.svg?logo=huggingface" alt="Huggingface Model"></a>
     <a href="https://agentflow.stanford.edu/"><img src="https://img.shields.io/badge/Website-AgentFlow-E5426E?logo=kashflow" alt="Website"></a>
-    <a href=""><img src="https://img.shields.io/badge/Coverage-AgentFlow-2176BC.svg?logo=x" alt="Coverage"></a>
+    <a href=""><img src="https://img.shields.io/badge/X-AgentFlow-2176BC.svg?logo=x" alt="X"></a>
     <a href="https://agentflowco.slack.com/ssb/redirect"><img src="https://img.shields.io/badge/Slack-AgentFlow-D41544.svg?logo=slack" alt="Slack"></a>
   </p>
 <!--- BADGES: END --->
@@ -223,7 +223,7 @@ executor = Executor(
 
 
 
-## 👋 Core Contributors
+## 🤝 Core Contributors
 
 <table>
 <tr>
@@ -288,7 +288,7 @@ We thank the following open-source projects:
 
 We thank [Lambda](https://lambda.ai/careers) for GPU support!
 
-## 🤝 Contributing
+## 👋 Contributing
 
 We are truly looking forward to open-source contributions to AgentFlow!  If you’re interested in contributing, collaborating, or reporting issues, please feel free to open an issue or submit a pull request (PR).  You can also reach us at [zhuofengli12345@gmail.com](mailto:zhuofengli12345@gmail.com) or join our Slack community: [AgentFlow](https://join.slack.com/t/agentflowco/shared_invite/zt-3f1bmai74-1CaZfpgkhRU061lYaH4zqQ).
 
@@ -297,34 +297,10 @@ We are also looking forward to your feedback and suggestions!
 
 ## 🚀 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=lupantech/AgentFlow&type=Date)](https://www.star-history.com/#lupantech/AgentFlow&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=lupantech/AgentFlow&type=Date)](https://star-history.com/#lupantech/AgentFlow&Date)
 
-<p align="right" style="font-size: 14px; color: #2176bc; margin-top: 20px;">
-  <a href="#readme-top" style="text-decoration: none; color: blue; font-weight: bold;">
+<p align="right" style="font-size: 14px; margin-top: 20px;">
+  <a href="#readme-top" style="text-decoration: none; font-weight: bold;">
     ↑ Back to Top ↑
   </a>
 </p>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
