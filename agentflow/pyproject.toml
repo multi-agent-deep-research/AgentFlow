@@ -30,6 +30,7 @@ include = ["agentflow"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.urls]
+ArXiv = "https://arxiv.org/abs/2510.05592"
 Homepage = "https://agentflows.github.io"
 Demo = "https://huggingface.co/spaces/AgentFlow/agentflow"
 Github = "https://github.com/agentflows/agentflows.github.io"
