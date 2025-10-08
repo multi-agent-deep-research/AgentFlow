@@ -295,6 +295,19 @@ We are truly looking forward to open-source contributions to AgentFlow!  If you�
 
 We are also looking forward to your feedback and suggestions!
 
+## 📚 Citation
+```bibtex
+@misc{li2025intheflowagenticoptimizationeffective,
+      title={In-the-Flow Agentic System Optimization for Effective Planning and Tool Use}, 
+      author={Zhuofeng Li and Haoxiang Zhang and Seungju Han and Sheng Liu and Jianwen Xie and Yu Zhang and Yejin Choi and James Zou and Pan Lu},
+      year={2025},
+      eprint={2510.05592},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2510.05592}, 
+}
+```
+
 <p align="right" style="font-size: 14px; margin-top: 20px;">
   <a href="#readme-top" style="text-decoration: none; font-weight: bold;">
     ↑ Back to Top ↑
