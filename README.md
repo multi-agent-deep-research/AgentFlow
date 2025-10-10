@@ -21,6 +21,7 @@ AgentFlow: In-the-Flow Agentic System Optimization for Effective Planning and To
     <a href="https://agentflow.stanford.edu/"><img src="https://img.shields.io/badge/Website-AgentFlow-E5426E?logo=kashflow" alt="Website"></a>
     <a href="https://x.com/lupantech/status/1976016000345919803"><img src="https://img.shields.io/badge/Coverage-AgentFlow-2176BC.svg?logo=x" alt="X"></a>
     <a href="https://join.slack.com/t/agentflow-co/shared_invite/zt-3f712xngl-LfxS4gmftAeKvcxR3nSkWQ"><img src="https://img.shields.io/badge/Slack-AgentFlow-D41544.svg?logo=slack" alt="Slack"></a>
+    <a href="https://join.slack.com/t/agentflow-co/shared_invite/zt-3f712xngl-LfxS4gmftAeKvcxR3nSkWQ"><img src="https://img.shields.io/badge/Wechat-AgentFlow-07C160.svg?logo=wechat" alt=""></a>
   </p>
 <!--- BADGES: END --->
 
