@@ -297,8 +297,8 @@ executor = Executor(
 
 We thank the following open-source projects:
 - [verl](https://github.com/volcengine/verl) for the excellent RL framework design.
-- [VLLM](https://github.com/vllm-project/vllm) for fast LLM inference support.
-- [Ver-Tool](https://github.com/TIGER-AI-Lab/verl-tool) and [agent-lightning](https://github.com/microsoft/agent-lightning) for their early-stage exploration in agentic RL Training. 
+- [vLLM ](https://github.com/vllm-project/vllm) for fast LLM inference support.
+- [Verl-Tool](https://github.com/TIGER-AI-Lab/verl-tool) and [agent-lightning](https://github.com/microsoft/agent-lightning) for their early-stage exploration in agentic RL Training. 
 
 We thank [Lambda](https://lambda.ai/careers) for GPU support!
 
