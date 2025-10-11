@@ -29,11 +29,9 @@ AgentFlow: In-the-Flow Agentic System Optimization for Effective Planning and To
 <!--- BADGES: END --->
 
 
-## 📰 News
-- **Oct. 10, 2025** - Honored to join the [Agent-Lightning Community](https://github.com/microsoft/agent-lightning#-community-projects)!
-- **Oct. 10, 2025** - Our X [post](https://x.com/lupantech/status/1976016000345919803) received 1K+ likes!
-- **Oct. 8, 2025** - Featured as Huggingface [Daily Paper #2](https://huggingface.co/papers/2510.05592)
-- **Oct. 7, 2025** - [Paper](https://arxiv.org/abs/2510.05592) released on arXiv
+## 📣 News
+- **[2025.10.10]** 🚀 Our X [post](https://x.com/lupantech/status/1976016000345919803) received 1K+ likes! Feel free to check out the post and join the discussion! 💬
+- **[2025.10.8]** 🔥 We are honored to be featured as 🤗 HuggingFace **[Daily Paper #2](https://huggingface.co/papers/2510.05592)**.
 
 ## 🌟 Why AgentFlow?
 AgentFlow is a **trainable, tool-integrated agentic framework** designed to overcome the **scalability** and **generalization limits** of today’s tool-augmented reasoning approaches.  
