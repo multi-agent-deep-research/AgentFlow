@@ -13,9 +13,9 @@ THREADS=20
 # Define all tasks to run
 TASKS=(
     # "gameof24"
-    "aime24"
+    # "aime24"
     # "amc23"
-    # "bamboogle"
+    "bamboogle"
     # "2wiki"
     # "gaia"
     # "musique"
