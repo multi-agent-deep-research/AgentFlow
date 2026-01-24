@@ -1,40 +1,81 @@
 import os
 import json
-import requests
-from dotenv import load_dotenv
-load_dotenv()
+import re
+from typing import Dict, List, Optional
+from html.parser import HTMLParser
 
-from google import genai
-from google.genai import types
+# pip install yandex-cloud-ml-sdk
+from yandex_cloud_ml_sdk import YCloudML
+from dotenv import load_dotenv
 
 from agentflow.tools.base import BaseTool
 
-# For formatting the response
-import requests
-from typing import List
-import re
+load_dotenv()
 
-# Tool name mapping - this defines the external name for this tool
 TOOL_NAME = "Ground_Google_Search_Tool"
 
 LIMITATIONS = """
 1. This tool is only suitable for general information search.
-2. This tool contains less domain specific information.
-3. This tools is not suitable for searching and analyzing videos at YouTube or other video platforms.
+2. Results are limited to what Yandex Search returns via its API.
+3. It is not suitable for searching and analyzing videos on YouTube or other video platforms.
 """
 
 BEST_PRACTICES = """
-1. Choose this tool when you want to search general information about a topic.
-2. Choose this tool for question type of query, such as "What is the capital of France?" or "What is the capital of France?"
-3. The tool will return a summarized information.
-4. This tool is more suiable for defination, world knowledge, and general information search.
+1. Choose this tool when you want general information about a topic.
+2. Use concise queries; avoid long, multi-part questions.
+3. Validate critical facts by opening the source URLs.
 """
 
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+
+
+class SearchResultParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.results = []
+        self.in_result = False
+        self.in_title = False
+        self.in_snippet = False
+        self.current_result = {}
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        if tag == "li" and attrs_dict.get("class") == "serp-item":
+            self.in_result = True
+            self.current_result = {}
+        elif self.in_result:
+            if tag == "a" and "href" in attrs_dict:
+                self.current_result["url"] = attrs_dict["href"]
+            if tag == "h2":
+                self.in_title = True
+                self.current_result["title"] = ""
+            if tag == "div" and "snippet" in attrs_dict.get("class", ""):
+                self.in_snippet = True
+                self.current_result["snippet"] = ""
+
+    def handle_endtag(self, tag):
+        if tag == "li" and self.in_result:
+            if self.current_result:
+                self.results.append(self.current_result)
+            self.in_result = False
+            self.current_result = {}
+        elif tag == "h2" and self.in_title:
+            self.in_title = False
+        elif tag == "div" and self.in_snippet:
+            self.in_snippet = False
+
+    def handle_data(self, data):
+        if self.in_title:
+            self.current_result["title"] = self.current_result.get("title", "") + data.strip()
+        elif self.in_snippet:
+            self.current_result["snippet"] = self.current_result.get("snippet", "") + data.strip()
+
+
 class Google_Search_Tool(BaseTool):
-    def __init__(self, model_string="gemini-2.5-flash"):
+    def __init__(self):
         super().__init__(
             tool_name=TOOL_NAME,
-            tool_description="A web search tool powered by Google's Gemini AI that provides real-time information from the internet with citation support.",
+            tool_description="A web search tool powered by Yandex Search API that provides real-time information from the internet.",
             tool_version="1.0.0",
             input_types={
                 "query": "str - The search query to find information on the web.",
@@ -44,225 +85,135 @@ class Google_Search_Tool(BaseTool):
             demo_commands=[
                 {
                     "command": 'execution = tool.execute(query="What is the capital of France?")',
-                    "description": "Search for general information about the capital of France with default citations enabled."
+                    "description": "Search for general information about the capital of France with default citations enabled.",
                 },
                 {
                     "command": 'execution = tool.execute(query="Who won the euro 2024?", add_citations=False)',
-                    "description": "Search for information about Euro 2024 winner without citations."
+                    "description": "Search for information about Euro 2024 winner without citations.",
                 },
                 {
                     "command": 'execution = tool.execute(query="Physics and Society article arXiv August 11, 2016", add_citations=True)',
-                    "description": "Search for specific academic articles with citations enabled."
-                }
+                    "description": "Search for specific academic articles with citations enabled.",
+                },
             ],
             user_metadata={
                 "limitations": LIMITATIONS,
                 "best_practices": BEST_PRACTICES,
-            }
+            },
         )
-        self.max_retries = 5
-        self.search_model = model_string
+        self.folder_id = os.getenv("YANDEX_SEARCH_FOLDER_ID")
+        self.api_key = os.getenv("YANDEX_SEARCH_API_KEY")
+        self.search_type = os.getenv("YANDEX_SEARCH_TYPE", "en")
+        self.poll_interval = int(os.getenv("YANDEX_SEARCH_POLL_INTERVAL", "1"))
+        print(self.api_key)
 
-        try:
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                raise Exception("Google API key not found. Please set the GOOGLE_API_KEY environment variable.")
-        except Exception as e:
-            raise Exception(f"Google API key not found. Please set the GOOGLE_API_KEY environment variable.")
-
-        self.client = genai.Client(api_key=api_key)
-
-
-    @staticmethod
-    def get_real_url(url):
-        """
-        Convert a redirect URL to the final real URL in a stable manner.
-
-        This function handles redirects by:
-        1.  Setting a browser-like User-Agent to avoid being blocked or throttled.
-        2.  Using a reasonable timeout to prevent getting stuck indefinitely.
-        3.  Following HTTP redirects automatically (default requests behavior).
-        4.  Catching specific request-related exceptions for cleaner error handling.
-        """
-        try:
-            # Headers to mimic a real browser visit
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
-            # allow_redirects=True is the default, but we state it for clarity.
-            # The request will automatically follow the 3xx redirect chain.
-            response = requests.get(
-                url, 
-                headers=headers, 
-                timeout=8, # Increased timeout for more reliability
-                allow_redirects=True 
+        if not self.folder_id or not self.api_key:
+            raise Exception(
+                "Yandex Search credentials not found. Please set YANDEX_SEARCH_FOLDER_ID and "
+                "YANDEX_SEARCH_API_KEY environment variables."
             )
-            
-            # After all redirects, response.url contains the final URL.
-            return response.url
-            
-        except Exception as e:
-            # Catching specific exceptions from the requests library is better practice.
-            # print(f"An error occurred: {e}")
-            return url
 
-    @staticmethod
-    def extract_urls(text: str) -> List[str]:
-        """
-        Extract all URLs from Markdown‑style citations [number](url) in the given text.
-
-        Args:
-            text: A string containing Markdown citations.
-
-        Returns:
-            A list of URL strings.
-        """
-        pattern = re.compile(r'\[\d+\]\((https?://[^\s)]+)\)')
-        urls = pattern.findall(text)
-        return urls
-
-    def reformat_response(self, response: str) -> str:
-        """
-        Reformat the response to a readable format.
-        """
-        urls = self.extract_urls(response)
-        for url in urls:
-            direct_url = self.get_real_url(url)
-            response = response.replace(url, direct_url)
-        return response
-
-    @staticmethod
-    def add_citations(response):
-        text = response.text
-        supports = response.candidates[0].grounding_metadata.grounding_supports
-        chunks = response.candidates[0].grounding_metadata.grounding_chunks
-
-        # Sort supports by end_index in descending order to avoid shifting issues when inserting.
-        sorted_supports = sorted(supports, key=lambda s: s.segment.end_index, reverse=True)
-
-        for support in sorted_supports:
-            end_index = support.segment.end_index
-            if support.grounding_chunk_indices:
-                # Create citation string like [1](link1)[2](link2)
-                citation_links = []
-                for i in support.grounding_chunk_indices:
-                    if i < len(chunks):
-                        uri = chunks[i].web.uri
-                        citation_links.append(f"[{i + 1}]({uri})")
-
-                citation_string = ", ".join(citation_links)
-                text = text[:end_index] + citation_string + text[end_index:]
-
-        return text
-
-    def _execute_search(self, query: str, add_citations_flag: bool):
-        """
-        https://ai.google.dev/gemini-api/docs/google-search
-        """
-        # Define the grounding tool
-        grounding_tool = types.Tool(
-            google_search=types.GoogleSearch()
+        self.sdk = YCloudML(
+            folder_id=self.folder_id,
+            auth=self.api_key,
         )
 
-        # Configure generation settings
-        config = types.GenerateContentConfig(
-            tools=[grounding_tool]
-        )
-        
+    def _parse_html_results(self, html_content: str) -> List[Dict[str, str]]:
+        url_pattern = r'<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>'
+        snippet_pattern = r'<div\s+[^>]*class="[^"]*snippet[^"]*"[^>]*>(.*?)</div>'
 
-        response = None
-        response_text = None
-        
-        for attempt in range(self.max_retries):
-            try:
-                response = self.client.models.generate_content(
-                    model=self.search_model,
-                    contents=query,
-                    config=config,
+        results = []
+        matches = re.finditer(url_pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+        for match in matches:
+            url = match.group(1)
+            title_html = match.group(2)
+            title = re.sub("<.*?>", "", title_html).strip()
+
+            if url.startswith("http") and title:
+                result = {"title": title, "url": url, "snippet": ""}
+
+                snippet_match = re.search(
+                    snippet_pattern, html_content[match.end() : match.end() + 500], re.DOTALL | re.IGNORECASE
                 )
-                response_text = response.text
-                # If we get here, the API call was successful, so break out of the retry loop
-                break
-            except Exception as e:
-                print(f"Google Search attempt {attempt + 1} failed: {str(e)}. Retrying...")
-                if attempt == self.max_retries - 1:  # Last attempt
-                    print(f"Google Search failed after {self.max_retries} attempts. Last error: {str(e)}")
-                    return f"Google Search tried {self.max_retries} times but failed. Last error: {str(e)}"
-                # Continue to next attempt
+                if snippet_match:
+                    snippet_html = snippet_match.group(1)
+                    result["snippet"] = re.sub("<.*?>", "", snippet_html).strip()
 
-        # Check if we have a valid response before proceeding
-        if response is None or response_text is None:
-            return "Google Search failed to get a valid response"
+                if result not in results:
+                    results.append(result)
 
-        # Add citations if needed
+                if len(results) >= 10:
+                    break
+
+        return results
+
+    def _execute_search(self, query: str) -> List[Dict[str, str]]:
         try:
-            response_text = self.add_citations(response) if add_citations_flag else response_text
-        except Exception as e:
-            pass
-            # print(f"Error adding citations: {str(e)}")
-            # Continue with the original response_text if citations fail
+            search = self.sdk.search_api.web(
+                search_type=self.search_type,
+                user_agent=USER_AGENT,
+            )
 
-        # Format the response
-        try:
-            response_text = self.reformat_response(response_text)
-        except Exception as e:
-            pass
-            # print(f"Error reformatting response: {str(e)}")
-            # Continue with the current response_text if reformatting fails
+            operation = search.run_deferred(query, format="html", page=0)
+            search_result_bytes = operation.wait(poll_interval=self.poll_interval)
+            search_result_html = search_result_bytes.decode("utf-8")
 
-        return response_text
+            return self._parse_html_results(search_result_html)
+
+        except Exception as e:
+            raise Exception(f"Yandex Search failed: {str(e)}")
 
     def execute(self, query: str, add_citations: bool = True):
-        """
-        Execute the Google search tool.
+        results = self._execute_search(query)
 
-        Parameters:
-            query (str): The search query to find information on the web.
-            add_citations (bool): Whether to add citations to the results. Default is True.
+        if not results:
+            return "No results found."
 
-        Returns:
-            str: The search results of the query.
-        """
-        # Perform the search
-        response = self._execute_search(query, add_citations)
-        
-        return response
+        lines = []
+        for idx, result in enumerate(results, start=1):
+            title = result.get("title", "Result")
+            snippet = result.get("snippet", "").strip()
+            url = result.get("url", "")
+            if add_citations:
+                line = f"{idx}. {title}"
+                if snippet:
+                    line += f" - {snippet}"
+                line += f" [{idx}]({url})"
+            else:
+                line = f"{idx}. {title}"
+                if snippet:
+                    line += f" - {snippet}"
+                if url:
+                    line += f" ({url})"
+            lines.append(line)
+
+        return "\n".join(lines)
 
     def get_metadata(self):
-        """
-        Returns the metadata for the Google_Search tool.
-
-        Returns:
-            dict: A dictionary containing the tool's metadata.
-        """
         metadata = super().get_metadata()
         return metadata
 
 
 if __name__ == "__main__":
-    """
-    Test:
-    cd agentflow/tools/google_search
-    python tool.py
-    """
+
     def print_json(result):
         import json
+
         print(json.dumps(result, indent=4))
 
     google_search = Google_Search_Tool()
 
-    # Get tool metadata
     metadata = google_search.get_metadata()
     print("Tool Metadata:")
     print_json(metadata)
 
     examples = [
-        {'query': 'What is the capital of France?', 'add_citations': True},
-        {'query': 'Who won the euro 2024?', 'add_citations': False},
-        {'query': 'Physics and Society article arXiv August 11, 2016', 'add_citations': True},
+        {"query": "What is the capital of France?", "add_citations": True},
+        {"query": "Who won the euro 2024?", "add_citations": False},
+        {"query": "Physics and Society article arXiv August 11, 2016", "add_citations": True},
     ]
-    
+
     for example in examples:
         print(f"\nExecuting search: {example['query']}")
         try:
