@@ -55,7 +55,12 @@ Ground Truth: {groundtruth}
 """
 
     verification_result = llm_scorer_engine(query_prompt, response_format=AnswerVerification)
-    
+
+    # Handle error responses from the LLM engine
+    if isinstance(verification_result, dict):
+        error_msg = verification_result.get('message', 'Unknown error')
+        raise RuntimeError(f"LLM scorer call failed: {error_msg}")
+
     return verification_result.true_false
 
 

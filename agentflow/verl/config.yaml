@@ -6,6 +6,10 @@ defaults:
   - ppo_trainer
   - _self_
 
+ray_init:
+  num_cpus: 8
+  object_store_memory: 2000000000  # 2GB object store
+
 agentflow:
   port: 9999
 
