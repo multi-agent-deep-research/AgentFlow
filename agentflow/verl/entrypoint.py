@@ -13,44 +13,59 @@ def main(config):
 
 
 def run_ppo(config) -> None:
+    import sys
+    print("[entrypoint] Starting run_ppo...", flush=True)
+
     if not ray.is_initialized():
         # this is for local ray cluster
+        print("[entrypoint] Initializing Ray...", flush=True)
         ray.init(
             runtime_env={
                 "env_vars": {"TOKENIZERS_PARALLELISM": "true", "NCCL_DEBUG": "WARN", "VLLM_LOGGING_LEVEL": "WARN"}
             },
-            num_cpus=config.ray_init.num_cpus, 
-            # To fix the omiga config issue, you can try not commenting this line if your speed is not that satisfying, while it may cause Error for cpu matching. 
         )
 
-    runner = TaskRunner.remote()
-    ray.get(runner.run.remote(config))
+    # Run training directly in main process (not as Ray remote task) to see output
+    print("[entrypoint] Running training directly in main process...", flush=True)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    run_training(config)
+    print("[entrypoint] Training completed.", flush=True)
 
 
-@ray.remote(num_cpus=1)  # please make sure main_task is not scheduled on head
-class TaskRunner:
-    def run(self, config):
+def run_training(config):
+    import sys
+    import traceback
+
+    try:
+        print("[Training] Starting...", flush=True)
+
         # print initial config
         from pprint import pprint
-
         from omegaconf import OmegaConf
-
         from verl.utils.fs import copy_to_local
 
-        pprint(OmegaConf.to_container(config, resolve=True))  # resolve=True will eval symbol values
+        print("[Training] Config:", flush=True)
+        pprint(OmegaConf.to_container(config, resolve=True))
+        sys.stdout.flush()
         OmegaConf.resolve(config)
 
         # download the checkpoint from hdfs
+        print(f"[Training] Downloading model: {config.actor_rollout_ref.model.path}", flush=True)
         local_path = copy_to_local(config.actor_rollout_ref.model.path)
+        print(f"[Training] Model downloaded to: {local_path}", flush=True)
 
         # instantiate tokenizer
         from verl.utils import hf_processor, hf_tokenizer
 
+        print("[Training] Loading tokenizer...", flush=True)
         trust_remote_code = config.data.get("trust_remote_code", False)
         tokenizer = hf_tokenizer(local_path, trust_remote_code=trust_remote_code)
-        processor = hf_processor(local_path, use_fast=True)  # used for multimodal LLM, could be none
+        processor = hf_processor(local_path, use_fast=True)
+        print("[Training] Tokenizer loaded.", flush=True)
 
         # define worker classes
+        print("[Training] Setting up worker classes...", flush=True)
         if config.actor_rollout_ref.actor.strategy in ["fsdp", "fsdp2"]:
             assert config.critic.strategy in ["fsdp", "fsdp2"]
             from verl.single_controller.ray import RayWorkerGroup
@@ -90,12 +105,7 @@ class TaskRunner:
             Role.Critic: global_pool_id,
         }
 
-        # we should adopt a multi-source reward function here
-        # - for rule-based rm, we directly call a reward score
-        # - for model-based rm, we call a model
-        # - for code related prompt, we send to a sandbox if there are test cases
-        # - finally, we combine all the rewards together
-        # - The reward type depends on the tag of the data
+        # reward model setup
         if config.reward_model.enable:
             if config.reward_model.strategy in ["fsdp", "fsdp2"]:
                 from verl.workers.fsdp_workers import RewardModelWorker
@@ -111,6 +121,7 @@ class TaskRunner:
             role_worker_mapping[Role.RefPolicy] = ray.remote(ActorRolloutRefWorker)
             mapping[Role.RefPolicy] = global_pool_id
 
+        print("[Training] Loading reward functions...", flush=True)
         reward_fn = load_reward_manager(
             config, tokenizer, num_examine=0, **config.reward_model.get("reward_kwargs", {})
         )
@@ -122,6 +133,7 @@ class TaskRunner:
         from verl.utils.dataset.rl_dataset import collate_fn
 
         # Use our special dataset
+        print("[Training] Loading datasets...", flush=True)
         train_dataset = AgentDataset(
             data_files=config.data.train_files,
             tokenizer=tokenizer,
@@ -134,7 +146,11 @@ class TaskRunner:
             processor=processor,
             config=config.data,
         )
+        print(f"[Training] Train dataset: {len(train_dataset)} samples", flush=True)
+        print(f"[Training] Val dataset: {len(val_dataset)} samples", flush=True)
+
         train_sampler = create_rl_sampler(config.data, train_dataset)
+        print("[Training] Creating trainer...", flush=True)
         trainer = AgentFlowTrainer(
             config=config,
             tokenizer=tokenizer,
@@ -149,8 +165,18 @@ class TaskRunner:
             collate_fn=collate_fn,
             train_sampler=train_sampler,
         )
+        print("[Training] Initializing workers...", flush=True)
         trainer.init_workers()
+        print("[Training] Starting training (fit)...", flush=True)
         trainer.fit()
+        print("[Training] Training completed!", flush=True)
+
+    except Exception as e:
+        print(f"[Training] ERROR: {e}", flush=True)
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        raise
 
 
 if __name__ == "__main__":

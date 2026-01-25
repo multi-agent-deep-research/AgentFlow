@@ -11,8 +11,8 @@ import agentops
 from opentelemetry.sdk.trace import ReadableSpan
 from .client import AgentFlowClient
 from .litagent import LitAgent
-from .types import Rollout, Task, Triplet, RolloutRawResult
-from .types import ParallelWorkerBase
+from .type_defs import Rollout, Task, Triplet, RolloutRawResult
+from .type_defs import ParallelWorkerBase
 from .tracer.base import BaseTracer
 from .tracer import TripletExporter
 

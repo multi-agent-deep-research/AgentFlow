@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, List, Union
 import aiohttp
 import requests
 
-from .types import Rollout, Task, TaskInput, TaskIfAny, ResourcesUpdate, NamedResources
+from .type_defs import Rollout, Task, TaskInput, TaskIfAny, ResourcesUpdate, NamedResources
 
 
 logger = logging.getLogger(__name__)

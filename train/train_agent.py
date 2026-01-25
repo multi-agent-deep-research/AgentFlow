@@ -35,7 +35,7 @@ def main():
 
     # --- Construct Python Command Arguments ---
     # Start with the core command parts
-    command = ["python", "-m", "agentflow.verl"]
+    command = ["python3", "-m", "agentflow.verl"]
 
     # Use argparse to handle user-provided command-line overrides
     # This allows users to pass args like `python run_training.py data.train_batch_size=16`

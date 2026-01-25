@@ -4,7 +4,7 @@ import logging
 import weakref
 from typing import Any, List, Dict, Union, Optional, TYPE_CHECKING
 
-from .types import NamedResources, Rollout, Task, TaskInput, Triplet, RolloutRawResult
+from .type_defs import NamedResources, Rollout, Task, TaskInput, Triplet, RolloutRawResult
 
 if TYPE_CHECKING:
     from .trainer import Trainer

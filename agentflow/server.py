@@ -10,7 +10,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Path
 from pydantic import Field
 
-from .types import (
+from .type_defs import (
     Rollout,
     Task,
     TaskIfAny,

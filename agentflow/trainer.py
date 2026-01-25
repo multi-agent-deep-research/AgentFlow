@@ -12,7 +12,7 @@ import agentops
 from .client import AgentFlowClient
 from .litagent import LitAgent
 from .runner import AgentRunner
-from .types import ParallelWorkerBase
+from .type_defs import ParallelWorkerBase
 from .tracer.base import BaseTracer
 from .tracer.agentops import AgentOpsTracer
 from .tracer.triplet import TripletExporter
