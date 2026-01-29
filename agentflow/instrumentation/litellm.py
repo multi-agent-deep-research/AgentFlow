@@ -16,6 +16,11 @@ def patched_set_attributes(self, span: Any, kwargs, response_obj: Optional[Any])
         span.set_attribute("prompt_token_ids", list(response_obj.get("prompt_token_ids")))
     if response_obj.get("response_token_ids"):
         span.set_attribute("response_token_ids", list(response_obj.get("response_token_ids")[0]))
+    # vLLM returns token_ids in choices (not response_token_ids)
+    elif response_obj.get("choices") and response_obj["choices"]:
+        choice = response_obj["choices"][0]
+        if choice.get("token_ids"):
+            span.set_attribute("response_token_ids", list(choice["token_ids"]))
 
 
 def instrument_litellm():

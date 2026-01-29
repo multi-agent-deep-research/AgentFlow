@@ -613,12 +613,33 @@ class AgentModeDaemon:
                 continue
 
             # The client should report triplets that contain prompt_ids and response_ids.
-            # Example triplet.prompt: {"token_ids": [...]}
-            # Example triplet.response: {"token_ids": [...]}
-            trace_list = [
-                {"prompt_ids": t.prompt.get("token_ids", []), "response_ids": t.response.get("token_ids", [])}
-                for t in rollout.triplets
-            ]
+            # Example triplet.prompt: {"token_ids": [...], "messages": [...]}
+            # Example triplet.response: {"token_ids": [...], "text": "..."}
+            trace_list = []
+            for t in rollout.triplets:
+                prompt_ids = t.prompt.get("token_ids", [])
+                response_ids = t.response.get("token_ids", [])
+
+                # Post-hoc tokenization fallback: if token_ids are empty but text is available,
+                # tokenize using the training tokenizer. This handles cases where the
+                # instrumentation pipeline cannot pass through token_ids (e.g., OpenAI client
+                # drops extra fields from vLLM responses).
+                if not prompt_ids and t.prompt.get("messages"):
+                    try:
+                        prompt_ids = self.tokenizer.apply_chat_template(
+                            t.prompt["messages"], add_generation_prompt=True
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to tokenize prompt messages: {e}")
+                if not response_ids and t.response.get("text"):
+                    try:
+                        response_ids = self.tokenizer.encode(
+                            t.response["text"], add_special_tokens=False
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to tokenize response text: {e}")
+
+                trace_list.append({"prompt_ids": prompt_ids, "response_ids": response_ids})
 
             final_reward = self._fillna_reward(rollout)
             info = {

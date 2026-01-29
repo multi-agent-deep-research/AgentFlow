@@ -464,23 +464,44 @@ class TraceTree:
             within_llm_call=False if dedup_llm_call else None,
             existing_llm_call_response_ids=set(),
         )
-        id_transitions = [
-            (
+        id_transitions = []
+        for llm_call, agent_name in llm_calls:
+            attrs = llm_call.span.attributes
+
+            # Extract prompt messages text from span attributes for post-hoc tokenization fallback
+            messages = []
+            i = 0
+            while True:
+                role = attrs.get(f"gen_ai.prompt.{i}.role")
+                content = attrs.get(f"gen_ai.prompt.{i}.content")
+                if role is None and content is None:
+                    break
+                messages.append({"role": role or "user", "content": content or ""})
+                i += 1
+
+            # Extract response text from span attributes
+            response_text = attrs.get("gen_ai.completion.0.content", "")
+
+            id_transitions.append((
                 llm_call.id,
                 Triplet(
-                    prompt={"token_ids": llm_call.span.attributes.get("prompt_token_ids", [])},
-                    response={"token_ids": llm_call.span.attributes.get("response_token_ids", [])},
+                    prompt={
+                        "token_ids": attrs.get("prompt_token_ids", []),
+                        "messages": messages,
+                    },
+                    response={
+                        "token_ids": attrs.get("response_token_ids", []),
+                        "text": response_text,
+                    },
                     reward=None,
                     metadata=dict(
-                        response_id=llm_call.span.attributes.get(
+                        response_id=attrs.get(
                             "gen_ai.response.id", None
                         ),  # it works at least for OpenAI
                         agent_name=agent_name,
                     ),
                 ),
-            )
-            for llm_call, agent_name in llm_calls
-        ]
+            ))
 
         rewards = self.match_rewards(reward_match, [call for call, _ in llm_calls])
         transitions = [

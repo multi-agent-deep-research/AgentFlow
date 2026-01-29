@@ -97,7 +97,7 @@ class ChatVLLM(EngineLM, CachedEngine):
             }
         
     def _generate_text(
-        self, prompt, system_prompt=None, max_tokens=2048, top_p=0.99, response_format=None, **kwargs
+        self, prompt, system_prompt=None, max_tokens=512, top_p=0.99, response_format=None, **kwargs
     ):
 
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
@@ -107,7 +107,7 @@ class ChatVLLM(EngineLM, CachedEngine):
             cache_or_none = self._check_cache(cache_key)
             if cache_or_none is not None:
                 return cache_or_none
-        
+
 
         # Chat models without structured outputs
         response = self.client.chat.completions.create(
@@ -153,7 +153,7 @@ class ChatVLLM(EngineLM, CachedEngine):
         return formatted_content
 
     def _generate_multimodal(
-        self, content: List[Union[str, bytes]], system_prompt=None, temperature=0, max_tokens=2048, top_p=0.99, response_format=None
+        self, content: List[Union[str, bytes]], system_prompt=None, temperature=0, max_tokens=512, top_p=0.99, response_format=None
     ):
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
         formatted_content = self._format_content(content)

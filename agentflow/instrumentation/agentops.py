@@ -29,10 +29,31 @@ def _patch_new_agentops():
 
     def _handle_chat_attributes_with_tokens(args=None, kwargs=None, return_value=None, **kws):
         attributes = _original_handle_chat_attributes(args=args, kwargs=kwargs, return_value=return_value, **kws)
+
         if hasattr(return_value, "prompt_token_ids"):
             attributes["prompt_token_ids"] = list(return_value.prompt_token_ids)
         if hasattr(return_value, "response_token_ids"):
             attributes["response_token_ids"] = list(return_value.response_token_ids[0])
+
+        # For vLLM via OpenAI client: check model_extra for prompt_token_ids
+        # and choices[].token_ids for response token IDs (Pydantic extra fields)
+        if "prompt_token_ids" not in attributes:
+            extra = getattr(return_value, "model_extra", None) or {}
+            if "prompt_token_ids" in extra:
+                attributes["prompt_token_ids"] = list(extra["prompt_token_ids"])
+        if "response_token_ids" not in attributes:
+            try:
+                choices = getattr(return_value, "choices", None)
+                if choices:
+                    choice = choices[0]
+                    # Check Pydantic model_extra on the choice object
+                    choice_extra = getattr(choice, "model_extra", None) or {}
+                    if "token_ids" in choice_extra:
+                        attributes["response_token_ids"] = list(choice_extra["token_ids"])
+                    elif hasattr(choice, "token_ids") and choice.token_ids:
+                        attributes["response_token_ids"] = list(choice.token_ids)
+            except Exception:
+                pass
 
         # For LiteLLM, response is a openai._legacy_response.LegacyAPIResponse
         if hasattr(return_value, "http_response") and hasattr(return_value.http_response, "json"):
@@ -42,6 +63,10 @@ def _patch_new_agentops():
                     attributes["prompt_token_ids"] = list(json_data["prompt_token_ids"])
                 if "response_token_ids" in json_data:
                     attributes["response_token_ids"] = list(json_data["response_token_ids"][0])
+                elif "choices" in json_data and json_data["choices"]:
+                    choice = json_data["choices"][0]
+                    if "token_ids" in choice:
+                        attributes["response_token_ids"] = list(choice["token_ids"])
 
         return attributes
 
@@ -84,6 +109,22 @@ def _patch_old_agentops():
         if hasattr(response, "response_token_ids"):
             span.set_attribute("response_token_ids", list(response.response_token_ids[0]))
 
+        # For vLLM via OpenAI client: check model_extra for prompt_token_ids
+        extra = getattr(response, "model_extra", None) or {}
+        if "prompt_token_ids" in extra:
+            span.set_attribute("prompt_token_ids", list(extra["prompt_token_ids"]))
+        try:
+            choices = getattr(response, "choices", None)
+            if choices:
+                choice = choices[0]
+                choice_extra = getattr(choice, "model_extra", None) or {}
+                if "token_ids" in choice_extra:
+                    span.set_attribute("response_token_ids", list(choice_extra["token_ids"]))
+                elif hasattr(choice, "token_ids") and choice.token_ids:
+                    span.set_attribute("response_token_ids", list(choice.token_ids))
+        except Exception:
+            pass
+
         # For LiteLLM, response is a openai._legacy_response.LegacyAPIResponse
         if hasattr(response, "http_response") and hasattr(response.http_response, "json"):
             json_data = response.http_response.json()
@@ -92,6 +133,10 @@ def _patch_old_agentops():
                     span.set_attribute("prompt_token_ids", list(json_data["prompt_token_ids"]))
                 if "response_token_ids" in json_data:
                     span.set_attribute("response_token_ids", list(json_data["response_token_ids"][0]))
+                elif "choices" in json_data and json_data["choices"]:
+                    choice = json_data["choices"][0]
+                    if "token_ids" in choice:
+                        span.set_attribute("response_token_ids", list(choice["token_ids"]))
 
     opentelemetry.instrumentation.openai.shared.chat_wrappers._handle_response = _handle_response_with_tokens
     logger.info("Patched earlier version of agentops using _handle_response")
