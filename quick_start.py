@@ -2,12 +2,18 @@
 from agentflow.agentflow.solver import construct_solver
 
 # Set the LLM engine name
-llm_engine_name = "gpt-4o" 
+llm_engine_name = "deepseek-chat" 
 # llm_engine_name = "dashscope" # you can use "dashscope" as well, to use the default API key in the environment variables qwen2.5-7b-instruct
 
 # Construct the solver
-solver = construct_solver(llm_engine_name=llm_engine_name)
+solver = construct_solver(
+    llm_engine_name=llm_engine_name,
+    model_engine=[llm_engine_name, llm_engine_name, llm_engine_name, llm_engine_name],
+    enabled_tools=["Base_Generator_Tool", "Google_Search_Tool", "Web_Search_Tool"],
+    tool_engine=[llm_engine_name, "Default", llm_engine_name],
+    max_steps=3
+)
 
 # Solve the user query
-output = solver.solve("What is the capital of France?")
+output = solver.solve("What is the weather in Moscow?")
 print(output["direct_output"])

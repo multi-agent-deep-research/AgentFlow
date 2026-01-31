@@ -68,6 +68,13 @@ bash scripts/restart_ray.sh
 
 echo "Ray server is reflushed. "
 
-sudo apt-get update
-sudo apt-get install -y jq
+
+
+### sudo apt-get update
+### sudo apt-get install -y jq
+conda install -c conda-forge jq
+conda install -c conda-forge parallel
+
+
+
 uv pip install yq

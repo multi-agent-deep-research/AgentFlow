@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import openai
+from together import Together
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -20,7 +21,7 @@ The {TOOL_NAME} has several limitations:
 3) Performance depends on the quality and relevance of the website content. 
 4) May return incomplete or inaccurate information if the website content is not comprehensive. 
 5) Limited by the chunking and embedding process which may miss context. 
-6) Requires OpenAI API access for embeddings and LLM generation.
+6) Requires OpenAI (or Together) API access for embeddings and LLM generation.
 """
 
 BEST_PRACTICE = f"""
@@ -110,7 +111,8 @@ class Web_Search_Tool(BaseTool):
         self.chunk_overlap = 20
         self.top_k = 10
         # self.embeddings_model = "text-embedding-3-large" # or "text-embedding-3-small" for efficiency
-        self.embeddings_model = "text-embedding-3-small"
+        # self.embeddings_model = "text-embedding-3-small"
+        self.embeddings_model = "togethercomputer/m2-bert-80M-32k-retrieval"
         self.max_window_size = 1000000
 
         # NOTE: deterministic mode
@@ -180,14 +182,20 @@ class Web_Search_Tool(BaseTool):
 
     def _embed_strings(self, strings):
         """
-        Embed the strings using OpenAI's embedding model.
+        Embed the strings using OpenAI's (or Together) embedding model.
         Parameters:
             strings (list): A list of strings to embed.
         Returns:
             list: A list of embeddings.
         """
         try:
-            client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            if self.embeddings_model in ["text-embedding-3-small", "text-embedding-3-large"]:
+                client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            elif self.embeddings_model in ["togethercomputer/m2-bert-80M-32k-retrieval"]:
+                client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
+            else:
+                raise Exception(f"Unknown embeddings_model: {self.embeddings_model}")
+
             embeddings = client.embeddings.create(
                 input=strings,
                 model=self.embeddings_model
@@ -283,9 +291,13 @@ if __name__ == "__main__":
     import json
 
     # Example usage of the Web_Search_Tool
-    tool = Web_Search_Tool(model_string="gpt-4o-mini") # NOTE: strong LLM for tool
+    # tool = Web_Search_Tool(model_string="gpt-4o-mini") # NOTE: strong LLM for tool
     # tool = Web_Search_Tool(model_string="gemini-1.5-flash") # NOTE: weak 8B model for tool
     # tool = Web_Search_Tool(model_string="dashscope") # NOTE: weak Qwen2.5-7B model for tool
+
+    # tool = Web_Search_Tool(model_string="together-openai/gpt-oss-20b")
+    tool = Web_Search_Tool(model_string="deepseek-chat")
+
 
     # Get tool metadata
     metadata = tool.get_metadata()
