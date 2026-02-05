@@ -115,7 +115,7 @@ class Solver:
                 else:
                     # [3] Generate the tool command
                     local_start_time = time.time()
-                    tool_command = self.executor.generate_tool_command(
+                    command = self.executor.generate_tool_command(
                         question, 
                         image_path, 
                         context, 
@@ -125,10 +125,9 @@ class Solver:
                         step_count,
                         json_data
                     )
-                    analysis, explanation, command = self.executor.extract_explanation_and_command(tool_command)
                     if self.verbose:
                         print(f"\n==> 📝 Step {step_count}: Command Generation ({tool_name})\n")
-                        print(f"[Analysis]: {analysis}\n[Explanation]: {explanation}\n[Command]: {command}")
+                        print(f"[Command]: {command}")
                         print(f"[Time]: {round(time.time() - local_start_time, 2)}s")
                     
                     # [4] Execute the tool command

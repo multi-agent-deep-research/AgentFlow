@@ -100,95 +100,37 @@ Instructions:
 5.  Please give the exact numbers and parameters should be used in the `tool.execute()` call.
 
 Output Format:
-Present your response in the following structured format. Do not include any extra text or explanations.
+Present your response as a valid JSON. Do not include any extra text or explanations.
 
-Generated Command:
-```python
-<command>
-```
+Schema:
+{{
+  "command": string
+}}
 
 Example1:
-Generated Command:
-```python
-execution = tool.execute(query="Summarize the following porblom:"Isaac has 100 toys, masa gets ...., how much are their together?")
-```
+{{
+  "command": "execution = tool.execute(query="Summarize the following porblom:"Isaac has 100 toys, masa gets ...., how much are their together?")"
+}}
 
 Example2:
-Generated Command:
-```python
-execution = tool.execute(query=["Methanol", "function of hyperbola", "Fermat's Last Theorem"])
-```
+{{
+  "command": "execution = tool.execute(query=["Methanol", "function of hyperbola", "Fermat's Last Theorem"])"
+}}
 """
-
         tool_command = self.llm_generate_tool_command(prompt_generate_tool_command, response_format=ToolCommand)
+
+        parsed_command = json.loads(tool_command)["command"]
+
         if json_data is not None:
             json_data[f"tool_commander_{step_count}_prompt"] = prompt_generate_tool_command
-            json_data[f"tool_commander_{step_count}_response"] = str(tool_command)
+            json_data[f"tool_commander_{step_count}_response"] = str(parsed_command)
 
-        return tool_command
+        return parsed_command
 
     def extract_explanation_and_command(self, response: Any) -> tuple:
-        def normalize_code(code: str) -> str:
-            # Remove leading/trailing whitespace and triple backticks if present
-            return re.sub(r'^```python\s*', '', code).rstrip('```').strip()
+       
 
-        analysis = "No analysis found."
-        explanation = "No explanation found."
-        command = "No command found."
-
-        if isinstance(response, str):
-            # Attempt to parse as JSON first
-            try:
-                response_dict = json.loads(response)
-                response_obj = ToolCommand(**response_dict)
-                analysis = response_obj.analysis.strip()
-                explanation = response_obj.explanation.strip()
-                command = response_obj.command.strip()
-            except Exception as e:
-                print(f"Failed to parse response as JSON: {str(e)}")
-                # Fall back to regex parsing on string
-                try:
-                    # Extract analysis
-                    analysis_pattern = r"Analysis:(.*?)Command Explanation"
-                    analysis_match = re.search(analysis_pattern, response, re.DOTALL | re.IGNORECASE)
-                    analysis = analysis_match.group(1).strip() if analysis_match else "No analysis found."
-
-                    # Extract explanation
-                    explanation_pattern = r"Command Explanation:(.*?)Generated Command"
-                    explanation_match = re.search(explanation_pattern, response, re.DOTALL | re.IGNORECASE)
-                    explanation = explanation_match.group(1).strip() if explanation_match else "No explanation found."
-
-                    # Extract command using "Generated Command:" prefix
-                    command_pattern = r"Generated Command:.*?```python\n(.*?)```"
-                    command_match = re.search(command_pattern, response, re.DOTALL | re.IGNORECASE)
-                    if command_match:
-                        command = command_match.group(1).strip()
-                    else:
-                        # Fallback: Extract ANY ```python ... ``` block (even without prefix)
-                        loose_command_pattern = r"```python\s*\n(.*?)```"
-                        loose_match = re.findall(loose_command_pattern, response, re.DOTALL | re.IGNORECASE)
-                        if loose_match:
-                            # Take the last or most complete one? Or first meaningful?
-                            # Here we take the longest one as heuristic
-                            command = max(loose_match, key=lambda x: len(x.strip())).strip()
-                        else:
-                            command = "No command found."
-                except Exception as e:
-                    print(f"Error during regex parsing: {str(e)}")
-                    analysis = "Parsing error."
-                    explanation = "Parsing error."
-                    command = "No command found."
-        elif isinstance(response, ToolCommand):
-            analysis = response.analysis.strip()
-            explanation = response.explanation.strip()
-            command = response.command.strip()
-        else:
-            command = "Invalid response type."
-
-        # Final normalization
-        command = normalize_code(command)
-
-        return analysis, explanation, command
+        return command
 
     def execute_tool_command(self, tool_name: str, command: str) -> Any:
         """
