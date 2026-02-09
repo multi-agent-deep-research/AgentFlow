@@ -76,8 +76,8 @@ class AgentFlowRollout:
             print(f"\n==> 📝 Solver Result:")
             print(f"""
             *******************************
-            RESULT
-            {result}
+            RESULT (direct_output)
+            {result['direct_output']}
             RESULT
             *******************************
             """)

@@ -188,6 +188,10 @@ class Google_Search_Tool(BaseTool):
                     line += f" ({url})"
             lines.append(line)
 
+        print("\n")
+        print(lines)
+        print("\n")
+
         return "\n".join(lines)
 
     def get_metadata(self):

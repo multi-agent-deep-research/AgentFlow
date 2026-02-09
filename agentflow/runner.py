@@ -16,6 +16,8 @@ from .types import ParallelWorkerBase
 from .tracer.base import BaseTracer
 from .tracer import TripletExporter
 
+from agentflow.logging import condprint
+
 logger = logging.getLogger(__name__)
 
 
@@ -234,9 +236,9 @@ class AgentRunner(ParallelWorkerBase):
         except Exception:
             logger.exception(f"{self._log_prefix(rollout_id)} Exception during rollout.")
         finally:
-            print(f"[DEBUG] Posting rollout: {rollout_obj}")
+            condprint(f"[DEBUG] Posting rollout: {rollout_obj}")
             response = await self.client.post_rollout_async(rollout_obj)
-            print(f"[DEBUG] Post rollout response: {response}")
+            condprint(f"[DEBUG] Post rollout response: {response}")
 
         return True
 

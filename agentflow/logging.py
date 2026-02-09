@@ -1,5 +1,5 @@
 import logging
-
+import os
 
 def configure_logger(level: int = logging.INFO, name: str = "agentflow") -> logging.Logger:
     logger = logging.getLogger(name)
@@ -14,3 +14,10 @@ def configure_logger(level: int = logging.INFO, name: str = "agentflow") -> logg
     logger.setLevel(level)
     logger.propagate = False  # prevent double logging
     return logger
+
+
+def condprint(*args, **kwargs):
+    print_flag = os.environ.get('PRINT_FLAG', '').lower()
+    
+    if print_flag == 'true':
+        print(*args, **kwargs)
