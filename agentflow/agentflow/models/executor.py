@@ -86,49 +86,35 @@ class Executor:
         Task: Generate a precise command to execute the selected tool.
 
 Context:
-- **Query:** {question}
-- **Sub-Goal:** {sub_goal}
-- **Tool Name:** {tool_name}
-- **Tool Metadata:** {tool_metadata}
-- **Relevant Data:** {context}
+- Query: {question}
+- Sub-Goal: {sub_goal}
+- Tool Name: {tool_name}
+- Tool Metadata: {tool_metadata}
+- Relevant Data: {context}
 
 Instructions:
-1.  Analyze the tool's required parameters from its metadata.
-2.  Construct valid Python code that addresses the sub-goal using the provided context and data.
-3.  The command must include at least one call to `tool.execute()`.
-4.  Each `tool.execute()` call must be assigned to a variable named **`execution`**.
-5.  Please give the exact numbers and parameters should be used in the `tool.execute()` call.
+1. Output exactly ONE line of valid Python code that addresses the sub-goal using the provided context and data.
+2. The line MUST start with:
+   execution = tool.execute(
+3. Do NOT define variables.
+4. Do NOT use line breaks.
+5. Do NOT add comments, explanations, markdown, or quotes around the output.
 
-Output Format:
-Present your response as a valid JSON. Do not include any extra text or explanations.
+Output Example 1:
+execution = tool.execute(query="Summarize the following problem: Isaac has 100 toys, Masa gets ..., how many are there together?")
 
-Schema:
-{{
-  "command": string
-}}
-
-Example1:
-{{
-  "command": "execution = tool.execute(query="Summarize the following porblom:"Isaac has 100 toys, masa gets ...., how much are their together?")"
-}}
-
-Example2:
-{{
-  "command": "execution = tool.execute(query=["Methanol", "function of hyperbola", "Fermat's Last Theorem"])"
-}}
+Output Example 2:
+execution = tool.execute(query=["Methanol", "function of hyperbola", "Fermat's Last Theorem"])
 """
-        tool_command = self.llm_generate_tool_command(prompt_generate_tool_command, response_format=ToolCommand)
+        command = self.llm_generate_tool_command(prompt_generate_tool_command)
+        command = command.strip()
 
-        parsed_command = json.loads(tool_command)["command"]
+        if not command.startswith("execution = tool.execute("):
+            raise ValueError(f"Invalid command generated:\n{command}")
 
         if json_data is not None:
             json_data[f"tool_commander_{step_count}_prompt"] = prompt_generate_tool_command
-            json_data[f"tool_commander_{step_count}_response"] = str(parsed_command)
-
-        return parsed_command
-
-    def extract_explanation_and_command(self, response: Any) -> tuple:
-       
+            json_data[f"tool_commander_{step_count}_response"] = str(command)
 
         return command
 

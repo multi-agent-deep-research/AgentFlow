@@ -201,7 +201,7 @@ class Solver:
 
                 else:
                     # Generate the tool command
-                    tool_command = self.executor.generate_tool_command(
+                    command = self.executor.generate_tool_command(
                         question, 
                         image_path, 
                         context, 
@@ -211,7 +211,6 @@ class Solver:
                         step_count,  # step_count
                         json_data  # json_data
                     )
-                    analysis, explanation, command = self.executor.extract_explanation_and_command(tool_command)
                     
                     if self.verbose:
                         print(f"\n## [{step_count}] Tool Command:")
