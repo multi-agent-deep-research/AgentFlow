@@ -19,6 +19,8 @@ from .types import (
     ResourcesUpdate,
 )
 
+from agentflow.logging import condprint
+
 logger = logging.getLogger(__name__)
 
 
@@ -126,8 +128,8 @@ class ServerDataStore:
         async with self._results_lock:
             self._processing_tasks.pop(rollout.rollout_id, None)
             self._completed_rollouts[rollout.rollout_id] = rollout
-            logging.condprint(f"[DEBUG] Rollout received and stored: {rollout}")
-            logging.condprint(f"Rollout received and stored: {rollout.rollout_id}")
+            condprint(f"[DEBUG] Rollout received and stored: {rollout}")
+            condprint(f"Rollout received and stored: {rollout.rollout_id}")
 
     async def retrieve_rollout(self, rollout_id: str) -> Optional[Rollout]:
         """
@@ -284,7 +286,7 @@ class AgentFlowServer:
             """Endpoint for clients to report a completed rollout."""
             if not self._store:
                 raise HTTPException(status_code=503, detail="Server not fully initialized.")
-            logging.condprint(f"[DEBUG] Post rollout received: {payload}")
+            condprint(f"[DEBUG] Post rollout received: {payload}")
             await self._store.store_rollout(payload)
             return GenericResponse(
                 status="ok",

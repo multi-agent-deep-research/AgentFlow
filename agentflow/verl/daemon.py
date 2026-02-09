@@ -18,6 +18,8 @@ from tensordict import TensorDict
 
 from verl import DataProto
 
+from agentflow.logging import condprint
+
 configure_logger()
 
 logger = logging.getLogger(__name__)
@@ -375,10 +377,10 @@ class AgentModeDaemon:
             print(f"Warning: Length of triplets is 0 for rollout {rollout.rollout_id}.")
         elif any(not r.response.get("token_ids", []) for r in rollout.triplets): # TODO: update
             print(f"Warning: Rollout {rollout.rollout_id} contains empty response...")
-            logging.condprint(rollout.triplets)
+            condprint(rollout.triplets)
         elif any(not r.prompt.get("token_ids", []) for r in rollout.triplets):
             print(f"Warning: Rollout {rollout.rollout_id} contains empty prompt...")
-            logging.condprint(rollout.triplets)
+            condprint(rollout.triplets)
     
     def _validate_rollout_for_retry(self, rollout: Rollout) -> bool:                                                                                                                                                                                                       
           """Returns True if rollout should be retried due to empty/invalid data"""                                                                                                                                                                                          
