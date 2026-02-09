@@ -112,7 +112,7 @@ class Web_Search_Tool(BaseTool):
         self.top_k = 10
         # self.embeddings_model = "text-embedding-3-large" # or "text-embedding-3-small" for efficiency
         # self.embeddings_model = "text-embedding-3-small"
-        self.embeddings_model = "togethercomputer/m2-bert-80M-32k-retrieval"
+        self.embeddings_model = os.environ.get("TOGETHER_EMBEDDING_MODEL", "text-embedding-3-small")
         self.max_window_size = 1000000
 
         # NOTE: deterministic mode
@@ -191,10 +191,8 @@ class Web_Search_Tool(BaseTool):
         try:
             if self.embeddings_model in ["text-embedding-3-small", "text-embedding-3-large"]:
                 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            elif self.embeddings_model in ["togethercomputer/m2-bert-80M-32k-retrieval"]:
-                client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
             else:
-                raise Exception(f"Unknown embeddings_model: {self.embeddings_model}")
+                client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
 
             embeddings = client.embeddings.create(
                 input=strings,
