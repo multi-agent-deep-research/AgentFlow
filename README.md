@@ -1,3 +1,36 @@
+# Instructions from Ignat
+## Setup
+- follow the original instructions for setup, you only need:
+  - YANDEX_SEARCH_FOLDER_ID
+  - YANDEX_SEARCH_API_KEY
+  - YANDEX_SEARCH_TYPE
+  - YANDEX_SEARCH_POLL_INTERVAL
+  - TOGETHER_API_KEY (or OPENAI_API_KEY; see [1] bellow)
+
+  the former are used for web search and the latter for embeddings 
+- adjust [`train/config.yaml`](train/config.yaml) and [`scripts/serve_vllm_qwen.sh`](scripts/serve_vllm_qwen.sh) for your gpu configuration
+- [1] if want to use openai model for embeddings change TOGETHER_EMBEDDING_MODEL in [`wetup_env.sh`](wetup_env.sh) to `text-embedding-3-small` or `text-embedding-3-large`
+
+## Train
+```shell
+source .venv/bin/activate
+source setup_env.sh
+```
+Create vllm instance for tools and other agents (if you use vllm)
+```shell
+bash scripts/serve_vllm_qwen.sh
+```
+Start agentflow training using Flow-GRPO with tmux:
+```bash
+# Create tmux session and start agentflow service (Window 0)
+tmux new-session -s agentflow
+bash train/serve_with_logs.sh
+
+# Create new window (Ctrl+B then C) and start training (Window 1)
+bash train/train_with_logs.sh
+```
+# End of Instructions from Ignat
+
 <a name="readme-top"></a>
 
 <p align="center">
