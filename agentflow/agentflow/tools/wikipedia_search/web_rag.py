@@ -5,6 +5,8 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+from together import Together
+
 from agentflow.tools.base import BaseTool
 from agentflow.engine.factory import create_llm_engine
 
@@ -105,7 +107,7 @@ class Web_Search_Tool(BaseTool):
         self.chunk_size = 200
         self.chunk_overlap = 20
         self.top_k = 10
-        self.embeddings_model = "text-embedding-3-large" # or "text-embedding-3-small" for efficiency
+        self.embeddings_model = os.environ.get("TOGETHER_EMBEDDING_MODEL", "text-embedding-3-small")
         self.max_window_size = 1000000
 
         # NOTE: deterministic mode
@@ -182,7 +184,11 @@ class Web_Search_Tool(BaseTool):
             list: A list of embeddings.
         """
         try:
-            client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            if self.embeddings_model in ["text-embedding-3-small", "text-embedding-3-large"]:
+                client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            else:
+                client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
+
             embeddings = client.embeddings.create(
                 input=strings,
                 model=self.embeddings_model
