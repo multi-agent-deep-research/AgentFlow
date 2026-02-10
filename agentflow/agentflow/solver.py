@@ -244,7 +244,7 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         toolbox_metadata=initializer.toolbox_metadata,
         available_tools=initializer.available_tools,
         verbose=verbose,
-        base_url=base_url if verifier_engine == llm_engine_name else None,
+        # base_url=base_url if verifier_engine == llm_engine_name else None,
         temperature=temperature
     )
 
@@ -256,7 +256,7 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         llm_engine_name=executor_engine,
         root_cache_dir=root_cache_dir,
         verbose=verbose,
-        base_url=base_url if executor_engine == llm_engine_name else None,  # Only use base_url for trainable model
+        # base_url=base_url if executor_engine == llm_engine_name else None,  # Only use base_url for trainable model
         temperature=temperature,
         tool_instances_cache=initializer.tool_instances_cache  # Pass the cached tool instances
     )
