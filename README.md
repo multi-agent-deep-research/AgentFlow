@@ -284,6 +284,45 @@ You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md
 
 [BrowseComp-Plus](https://github.com/texttron/BrowseComp-Plus) is a benchmark for evaluating Deep Research agents with a fixed corpus of ~100K curated documents. AgentFlow now supports evaluation on this benchmark.
 
+### Dependencies
+
+**For BM25 search (requires Java JDK):**
+```bash
+# Option 1: Install Java JDK 21 via conda (recommended)
+conda install -c conda-forge openjdk=21
+
+# Option 2: Install via system package manager
+sudo apt-get install -y openjdk-21-jdk
+
+# Set JVM path (if using conda)
+export JVM_PATH=$HOME/miniconda3/lib/jvm/lib/server/libjvm.so
+
+# Install Python packages
+pip install pyserini>=1.2.0
+pip install git+https://github.com/texttron/tevatron.git
+pip install qwen-omni-utils
+```
+
+**For FAISS search (no Java required):**
+```bash
+pip install faiss-cpu>=1.11.0.post1
+pip install git+https://github.com/texttron/tevatron.git
+pip install qwen-omni-utils
+```
+
+**Common dependencies (both BM25 and FAISS):**
+```bash
+pip install datasets>=4.0.0 tqdm>=4.67.1
+```
+
+**Quick install (all at once):**
+```bash
+pip install -r requirements-browsecomp.txt
+# Then install Java (for BM25) or tevatron dependencies:
+conda install -c conda-forge openjdk=21  # for BM25 only
+pip install git+https://github.com/texttron/tevatron.git qwen-omni-utils
+```
+
 ### Setup
 
 1. **Download BrowseComp-Plus** (if not already present):
@@ -310,7 +349,19 @@ python scripts_build_index/decrypt_dataset.py \
 cd ../AgentFlow
 ```
 
-### Run Evaluation
+### Run Evaluation (Test with few samples)
+
+```bash
+# Test with just 5 queries
+python -m agentflow.evaluations browsecomp \
+    --index-path ../BrowseComp-Plus/indexes/bm25_index \
+    --index-type bm25 \
+    --output-dir runs/agentflow_browsecomp_test \
+    --num-queries 5 \
+    --max-steps 3
+```
+
+### Run Full Evaluation
 
 ```bash
 python -m agentflow.evaluations browsecomp \
