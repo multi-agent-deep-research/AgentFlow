@@ -1,6 +1,7 @@
 import re
 from pydantic import BaseModel
 from agentflow.engine.deepseek import ChatDeepseek
+from agentflow.engine.vllm import ChatVLLM
 import os
 import json
 
@@ -10,8 +11,8 @@ class AnswerVerification(BaseModel):
     true_false: bool
 
 try:
-    llm_scorer_engine = ChatDeepseek(
-        model_string="deepseek-chat",
+    llm_scorer_engine = ChatVLLM(
+        model_string="Qwen/Qwen2.5-7B-Instruct",
         is_multimodal=False,
         use_cache=True
     )
@@ -22,7 +23,7 @@ except Exception as e:
 
 def compute_score(question: str,  groundtruth: str, answer_extracted: str,) -> bool:
     """
-    Uses deepseek to determine if the extracted answer matches the groundtruth.
+    Uses an LLM to determine if the extracted answer matches the groundtruth.
     
     Args:
         question: The full question text, including options.
@@ -51,36 +52,28 @@ Question: {question}
 Model Response: {answer_extracted}
 Ground Truth: {groundtruth}
 
-**Analysis Requirement:**
-- Provide a brief comparison analysis (1–2 sentences).
-- State what was extracted and why it does or does not match the Ground Truth.
-- Do not include step-by-step reasoning or restate the full answers.
-
-**Output format**:
-Return ONLY valid JSON, no markdown, no extra text.
-
-Schema:
-{{
-  "analysis": string,
-  "true_false": boolean
-}}
+**Output Instructions:**
+- Write a brief analysis (1–3 sentences).
+- On the FINAL line, output EXACTLY one of:
+VERDICT: True
+VERDICT: False
+- Do NOT write anything after the verdict line.
 """
 
     raw_response = llm_scorer_engine(query_prompt)
 
-    try:
-        parsed = json.loads(raw_response)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Failed to parse LLM JSON output: {raw_response}") from e
+    print("\n[EVALUATOR]\n")
+    print(raw_response)
 
-    if "true_false" not in parsed:
-        raise RuntimeError(f"Missing 'true_false' field in LLM output: {parsed}")
+    end = raw_response.strip().lower()[-7:]
 
-    if not isinstance(parsed["true_false"], bool):
-        raise RuntimeError(f"'true_false' must be a boolean: {parsed}")
-
-    return parsed["true_false"]
-
+    if "true" in end:
+        return True
+    elif "false" in end:
+        return False
+    else:
+        raise ValueError("LLM response does not contain a clear 'True' or 'False' verdict.")
+    
 
 def eval(question: str, groundtruth: any, answer_extracted: any, val: bool = False) -> float:
     """
