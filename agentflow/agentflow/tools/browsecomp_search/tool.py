@@ -49,10 +49,27 @@ BEST_PRACTICES = """
 # Try to import BrowseComp-Plus searcher
 try:
     import sys
-    # Add BrowseComp-Plus to path if it exists in the parent directory
-    browsecomp_path = Path(__file__).parent.parent.parent.parent.parent / "BrowseComp-Plus"
-    if browsecomp_path.exists():
-        sys.path.insert(0, str(browsecomp_path))
+    # Find BrowseComp-Plus directory - look in multiple possible locations
+    # 1. Same level as AgentFlow repo (sibling directory)
+    # 2. Inside AgentFlow repo
+    # 3. As installed package
+
+    current_file = Path(__file__).resolve()
+
+    # Try sibling directory (BrowseComp-Plus as sibling to AgentFlow)
+    repo_root = current_file.parent.parent.parent.parent.parent  # .../agentflow/agentflow/tools/browsecomp_search -> .../AgentFlow/
+    sibling_browsecomp = repo_root / "BrowseComp-Plus"
+
+    # Try inside AgentFlow
+    internal_browsecomp = repo_root / "BrowseComp-Plus"
+
+    if sibling_browsecomp.exists():
+        sys.path.insert(0, str(sibling_browsecomp))
+        from searcher.searchers.base import BaseSearcher
+        from searcher.searchers import SearcherType
+        BROWSECOMP_AVAILABLE = True
+    elif internal_browsecomp.exists():
+        sys.path.insert(0, str(internal_browsecomp))
         from searcher.searchers.base import BaseSearcher
         from searcher.searchers import SearcherType
         BROWSECOMP_AVAILABLE = True
@@ -63,6 +80,8 @@ try:
         BROWSECOMP_AVAILABLE = True
 except ImportError:
     BROWSECOMP_AVAILABLE = False
+    import logging
+    logger = logging.getLogger(__name__)
     logger.warning(
         "BrowseComp-Plus searcher not found. "
         "Install it or ensure BrowseComp-Plus is in the parent directory."
