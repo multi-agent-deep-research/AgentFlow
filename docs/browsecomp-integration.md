@@ -80,8 +80,15 @@ Use BrowseComp-Plus queries as training data for Flow-GRPO:
 
 **Installation:**
 ```bash
+# Install Java JDK 21
 conda install -c conda-forge openjdk=21
-pip install pyserini tevatron qwen-omni-utils
+
+# Install Python dependencies
+uv pip install -r requirements-browsecomp.txt
+
+# Or install manually
+uv pip install pyserini>=0.39.0 faiss-cpu>=1.13.0 peft>=0.18.0 accelerate>=0.12.0
+uv pip install git+https://github.com/texttron/tevatron.git
 ```
 
 ### FAISS Search (Embedding-based)
@@ -97,27 +104,70 @@ pip install pyserini tevatron qwen-omni-utils
 
 **Installation:**
 ```bash
-pip install faiss-cpu tevatron qwen-omni-utils
-# Note: FAISS search requires GPU for embedding inference
+# All dependencies from requirements-browsecomp.txt
+uv pip install -r requirements-browsecomp.txt
+
+# For GPU support, replace faiss-cpu with:
+uv pip install faiss-gpu>=1.13.0
 ```
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Clone BrowseComp-Plus and Download Indexes
 
 ```bash
-# Common dependencies
-pip install datasets tqdm
+# Clone BrowseComp-Plus repository (sibling to AgentFlow)
+cd /path/to/parent/dir
+git clone https://github.com/texttron/BrowseComp-Plus.git
 
-# For BM25 search
-pip install pyserini tevatron qwen-omni-utils
-conda install -c conda-forge openjdk=21
-
-# Or for FAISS
-pip install faiss-cpu tevatron qwen-omni-utils
+# Download pre-built indexes
+cd BrowseComp-Plus
+bash scripts_build_index/download_indexes.sh
 ```
 
-### 2. Run Tests
+### 2. Install Dependencies
+
+```bash
+# Using uv (recommended for AgentFlow)
+uv pip install -r requirements-browsecomp.txt
+
+# Or with pip
+pip install -r requirements-browsecomp.txt
+
+# Install Java JDK 21 for BM25 search
+conda install -c conda-forge openjdk=21
+```
+
+### 3. Run the Demo Script
+
+The easiest way to see BrowseComp-Plus in action with AgentFlow:
+
+```bash
+# Set environment variables for the search tool
+export BROWSECOMP_INDEX_PATH=/path/to/BrowseComp-Plus/indexes/bm25
+export BROWSECOMP_INDEX_TYPE=bm25
+
+# Run the quick start demo
+python quick_start_browsecomp.py
+```
+
+**Expected output:**
+```
+======================================================================
+AgentFlow Quick Start with BrowseComp-Plus
+======================================================================
+
+Query: What is the capital of France?
+======================================================================
+
+[Tool]: BrowseComp_Search_Tool
+[Command]: execution = tool.execute(query="capital of France", k=5)
+
+==> 🐙 Final Answer:
+The capital of France is Paris.
+```
+
+### 4. Run Tests
 
 ```bash
 # Test everything (dataset + BM25 + FAISS)
@@ -133,7 +183,7 @@ python test_browsecomp.py --index-type bm25
 python test_browsecomp.py --index-type faiss
 ```
 
-### 3. Use BrowseComp Search as a Tool
+### 5. Use BrowseComp Search as a Standalone Tool
 
 ```python
 from agentflow.tools.browsecomp_search import BrowseComp_Search_Tool
