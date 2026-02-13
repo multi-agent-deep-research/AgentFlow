@@ -2,6 +2,7 @@ import re
 from pydantic import BaseModel
 from agentflow.engine.deepseek import ChatDeepseek
 from agentflow.engine.vllm import ChatVLLM
+from agentflow.engine.deepinfra import ChatDeepInfra
 import os
 import json
 
@@ -11,8 +12,14 @@ class AnswerVerification(BaseModel):
     true_false: bool
 
 try:
-    llm_scorer_engine = ChatVLLM(
-        model_string="Qwen/Qwen2.5-7B-Instruct",
+    # llm_scorer_engine = ChatVLLM(
+    #     model_string="Qwen/Qwen2.5-7B-Instruct",
+    #     is_multimodal=False,
+    #     use_cache=True
+    # )
+
+    llm_scorer_engine = ChatDeepInfra(
+        model_string="moonshotai/Kimi-K2.5",
         is_multimodal=False,
         use_cache=True
     )

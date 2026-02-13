@@ -63,6 +63,18 @@ def create_llm_engine(model_string: str, use_cache: bool = False, is_multimodal:
         }
         return ChatDashScope(**config)
 
+    # === DeepInfra ===
+    elif "deepinfra" in model_string:
+        from .deepinfra import ChatDeepInfra
+        model_string = model_string.replace("deepinfra-", "")
+
+        config = {
+            "model_string": model_string,
+            "use_cache": use_cache,
+            "is_multimodal": is_multimodal,
+        }
+        return ChatDeepInfra(**config)
+
     # === Anthropic (Claude) ===
     elif "claude" in model_string:
         from .anthropic import ChatAnthropic
