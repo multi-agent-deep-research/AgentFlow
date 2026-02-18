@@ -58,7 +58,7 @@ try:
 
     # Try sibling directory (BrowseComp-Plus as sibling to AgentFlow)
     repo_root = current_file.parent.parent.parent.parent.parent  # .../agentflow/agentflow/tools/browsecomp_search -> .../AgentFlow/
-    sibling_browsecomp = repo_root / "BrowseComp-Plus"
+    sibling_browsecomp = repo_root.parent / "BrowseComp-Plus"  # Go to parent of AgentFlow
 
     # Try inside AgentFlow
     internal_browsecomp = repo_root / "BrowseComp-Plus"

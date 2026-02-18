@@ -133,7 +133,11 @@ Be biref and precise with insight.
             """
             Normalizes a tool name robustly using regular expressions.
             It handles any combination of spaces and underscores as separators.
+            Also strips backticks, quotes, and other common wrapper characters.
             """
+            # Strip backticks, quotes, and whitespace from tool name
+            tool_name = tool_name.strip().strip('`').strip('"').strip("'").strip()
+
             def to_canonical(name: str) -> str:
                 # Split the name by any sequence of one or more spaces or underscores
                 parts = re.split('[ _]+', name)
@@ -141,15 +145,17 @@ Be biref and precise with insight.
                 return "_".join(part.lower() for part in parts)
 
             normalized_input = to_canonical(tool_name)
-            
+
             for tool in self.available_tools:
                 if to_canonical(tool) == normalized_input:
                     return tool
-                    
+
             return f"No matched tool given: {tool_name}"
 
         try:
             if isinstance(response, str):
+                # Debug: print full response
+                print(f"DEBUG planner response:\n{response}")
                 # Attempt to parse the response as JSON
                 try:
                     response_dict = json.loads(response)
@@ -199,7 +205,7 @@ Tool Metadata:
 {self.toolbox_metadata}
 
 Previous Steps and Their Results:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=1000)}
 
 Current Step: {step_count} in {max_step_count} steps
 Remaining Steps: {max_step_count - step_count}
@@ -263,7 +269,7 @@ Context:
 - **Query Analysis:** {query_analysis}
 - **Available Tools:** {self.available_tools}
 - **Toolbox Metadata:** {self.toolbox_metadata}
-- **Previous Steps:** {memory.get_actions()}
+- **Previous Steps:** {memory.get_actions(max_chars_per_result=1000)}
 
 Instructions:
 1. Analyze the query, previous steps, and available tools.
@@ -301,7 +307,7 @@ Context:
 Query: {question}
 Image: {image_info}
 Actions Taken:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=1000)}
 
 Instructions:
 1. Review the query, image, and all actions taken during the process.
@@ -342,7 +348,7 @@ Task: Generate the final output based on the query and the results from all tool
 
 Context:
 - **Query:** {question}
-- **Actions Taken:** {memory.get_actions()}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=1000)}
 
 Instructions:
 1. Review the query and the results from all tool executions.
@@ -375,7 +381,7 @@ Image: {image_info}
 Initial Analysis:
 {self.query_analysis}
 Actions Taken:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=1000)}
 
 Please generate the concise output based on the query, image information, initial analysis, and actions taken. Break down the process into clear, logical, and conherent steps. Conclude with a precise and direct answer to the query.
 
@@ -388,7 +394,7 @@ Task: Generate a concise final answer to the query based on all provided context
 Context:
 - **Query:** {question}
 - **Initial Analysis:** {self.query_analysis}
-- **Actions Taken:** {memory.get_actions()}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=1000)}
 
 Instructions:
 1. Review the query and the results from all actions.

@@ -51,7 +51,7 @@ Image: {image_info}
 Available Tools: {self.available_tools}
 Toolbox Metadata: {self.toolbox_metadata}
 Initial Analysis: {query_analysis}
-Memory (tools used and results): {memory.get_actions()}
+Memory (tools used and results): {memory.get_actions(max_chars_per_result=1000)}
 
 Detailed Instructions:
 1. Carefully analyze the query, initial analysis, and image (if provided):
@@ -112,7 +112,7 @@ Context:
 - **Available Tools:** {self.available_tools}
 - **Toolbox Metadata:** {self.toolbox_metadata}
 - **Initial Analysis:** {query_analysis}
-- **Memory (Tools Used & Results):** {memory.get_actions()}
+- **Memory (Tools Used & Results):** {memory.get_actions(max_chars_per_result=1000)}
 
 Instructions:
 1.  Review the query, initial analysis, and memory.
@@ -146,6 +146,8 @@ IMPORTANT: The response must end with either "Conclusion: STOP" or "Conclusion: 
 
     def extract_conclusion(self, response: Any) -> Tuple[str, str]:
         if isinstance(response, str):
+            # Debug: print response info
+            print(f"DEBUG verifier response:\n{response}")
             # Attempt to parse the response as JSON
             try:
                 response_dict = json.loads(response)
