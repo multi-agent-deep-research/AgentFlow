@@ -111,7 +111,11 @@ class BrowseComp_Search_Tool(BaseTool):
         self,
         index_type: str = "bm25",
         index_path: Optional[str] = None,
-        snippet_max_tokens: Optional[int] = None,
+        # From BrowseComp-Plus paper: "The retriever tool is set to retrieve the top k=5 search results,
+        # where each result is truncated to the first 512 tokens of the corresponding document.
+        # This truncation is due to budget constraints, which prevent us from providing full document content."
+        # Reference: https://arxiv.org/abs/2501.12959
+        snippet_max_tokens: Optional[int] = 512,
         k: int = 5,
         include_get_document: bool = True,
     ):

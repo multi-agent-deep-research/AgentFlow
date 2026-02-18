@@ -106,7 +106,7 @@ def run_evaluation(
     num_queries=None,
     max_steps=3,
     planner_model="vllm-AgentFlow/agentflow-planner-7b",
-    openrouter_model="litellm-openrouter/qwen/qwen-2.5-72b-instruct",
+    openrouter_model="litellm-openrouter/qwen/qwen-2.5-7b-instruct",
 ):
     """
     Run evaluation on BrowseComp-Plus.
@@ -216,7 +216,7 @@ def run_evaluation(
         max_steps=max_steps,
         max_time=300,  # 5 minutes per query
         max_tokens=4000,
-        verbose=False,
+        verbose=True,
         base_url=vllm_base_url,  # For local vLLM
         temperature=0.0,
     )
@@ -253,66 +253,22 @@ def run_evaluation(
             print(f"  Gold Answer: {gold_answer}")
             result = solver.solve(formatted_query)
 
-            # Parse result - prefer final_output (Detailed Solution) over direct_output (Final Answer)
-            # final_output has cleaner "Exact Answer:" format, direct_output has verbose "Answer:" format
+            # Parse result - save both outputs for comparison with gold_answer
             final_output = result.get("final_output", "")
             direct_output = result.get("direct_output", "")
-            output_text = final_output or direct_output
-
-            # Extract Explanation, Exact Answer, Confidence (BrowseComp format)
-            import re
-            explanation = ""
-            exact_answer = ""
-            confidence = 100
-
-            # Extract from final_output first (has clean "Exact Answer:" format)
-            if final_output:
-                # Extract Explanation
-                exp_match = re.search(r'\*?\*?Explanation:?\*?\*?\s*(.*?)(?=\*?\*?Exact Answer:|$)', final_output, re.DOTALL | re.IGNORECASE)
-                if exp_match:
-                    explanation = exp_match.group(1).strip()
-
-                # Extract Exact Answer (clean format in final_output)
-                ans_match = re.search(r'\*?\*?Exact Answer:?\*?\*?\s*(.*?)(?=\*?\*?Confidence:|$)', final_output, re.DOTALL | re.IGNORECASE)
-                if ans_match:
-                    exact_answer = ans_match.group(1).strip()
-
-                # Extract Confidence
-                conf_match = re.search(r'\*?\*?Confidence:?\*?\*?[^\d]*(\d+)\s*%', final_output, re.IGNORECASE)
-                if conf_match:
-                    confidence = int(conf_match.group(1))
-
-            # Fallback to direct_output if no exact_answer found
-            if not exact_answer and direct_output:
-                ans_match = re.search(r'\*?\*?(?:Exact\s+)?Answer:?\*?\*?\s*(.*?)(?=\*?\*?Confidence:|$)', direct_output, re.DOTALL | re.IGNORECASE)
-                if ans_match:
-                    exact_answer = ans_match.group(1).strip()
-
-            # Clean up markdown formatting and quotes from exact_answer
-            if exact_answer:
-                exact_answer = re.sub(r'^\*\*|\*\*$', '', exact_answer).strip()
-                exact_answer = re.sub(r'^["\'](.*)["\']\.?$', r'\1', exact_answer).strip()
-                exact_answer = exact_answer.rstrip('.')
-
-            # Extract docids from explanation (format: [123])
-            docids = re.findall(r'\[(\d+)\]', explanation)
 
             result_obj = {
                 "query_id": query_id,
                 "gold_answer": gold_answer,
-                "status": "completed" if output_text else "failed",
+                "status": "completed" if (final_output or direct_output) else "failed",
                 "final_output": final_output,
                 "direct_output": direct_output,
-                "explanation": explanation,
-                "exact_answer": exact_answer,
-                "confidence": confidence,
-                "retrieved_docids": docids,
                 "memory": result.get("memory", {}),
                 "step_count": result.get("step_count", 0),
                 "execution_time": result.get("execution_time", 0),
             }
 
-            print(f"  Predicted: {exact_answer[:100] if exact_answer else 'NO ANSWER'}...")
+            print(f"  Output: {(final_output or direct_output)[:100]}...")
 
         except Exception as e:
             print(f"  ERROR: {e}")
@@ -321,9 +277,11 @@ def run_evaluation(
                 "gold_answer": gold_answer,
                 "status": "error",
                 "error": str(e),
-                "result": [{"type": "output_text", "output": ""}],
-                "retrieved_docids": [],
-                "tool_call_counts": {},
+                "final_output": "",
+                "direct_output": "",
+                "memory": {},
+                "step_count": 0,
+                "execution_time": 0,
             }
 
         # Save result
@@ -427,7 +385,7 @@ def main():
     )
     parser.add_argument(
         "--openrouter-model",
-        default="litellm-openrouter/qwen/qwen-2.5-72b-instruct",
+        default="litellm-openrouter/qwen/qwen-2.5-7b-instruct",
         help="Model for verifier/executor (OpenRouter via LiteLLM)"
     )
 
