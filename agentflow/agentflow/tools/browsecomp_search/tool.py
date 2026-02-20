@@ -109,7 +109,7 @@ class BrowseComp_Search_Tool(BaseTool):
 
     def __init__(
         self,
-        index_type: str = "bm25",
+        index_type: Optional[str] = None,
         index_path: Optional[str] = None,
         # From BrowseComp-Plus paper: "The retriever tool is set to retrieve the top k=5 search results,
         # where each result is truncated to the first 512 tokens of the corresponding document.
@@ -193,14 +193,27 @@ class BrowseComp_Search_Tool(BaseTool):
         """Create the searcher instance based on index type."""
         from argparse import Namespace
 
-        args = Namespace(index_path=self.index_path)
-
         if self.index_type == "bm25":
+            args = Namespace(index_path=self.index_path)
             from searcher.searchers.bm25_searcher import BM25Searcher
             return BM25Searcher(args)
         elif self.index_type == "faiss":
-            from searcher.searchers.faiss_searcher import FAISSSearcher
-            return FAISSSearcher(args)
+            model_name = os.getenv("BROWSECOMP_MODEL_NAME", "Qwen/Qwen3-Embedding-8B")
+            normalize = os.getenv("BROWSECOMP_NORMALIZE", "true").lower() == "true"
+
+            args = Namespace(
+                index_path=self.index_path,
+                model_name=model_name,
+                normalize=normalize,
+                pooling="eos",
+                torch_dtype="float16",
+                dataset_name="Tevatron/browsecomp-plus-corpus",
+                task_prefix="Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+                max_length=8192,
+                gpu_id=None,
+            )
+            from searcher.searchers.faiss_searcher import FaissSearcher
+            return FaissSearcher(args)
         else:
             raise ValueError(f"Unknown index type: {self.index_type}. Use 'bm25' or 'faiss'.")
 

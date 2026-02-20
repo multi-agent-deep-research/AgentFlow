@@ -135,8 +135,9 @@ Be biref and precise with insight.
             It handles any combination of spaces and underscores as separators.
             Also strips backticks, quotes, and other common wrapper characters.
             """
-            # Strip backticks, quotes, and whitespace from tool name
+            # Strip markdown formatting, backticks, quotes, bullets, and whitespace
             tool_name = tool_name.strip().strip('`').strip('"').strip("'").strip()
+            tool_name = re.sub(r'^[\s*\-•#>`]+', '', tool_name).strip().strip('`').strip()
 
             def to_canonical(name: str) -> str:
                 # Split the name by any sequence of one or more spaces or underscores
