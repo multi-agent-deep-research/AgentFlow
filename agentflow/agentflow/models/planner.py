@@ -310,38 +310,10 @@ Image: {image_info}
 Actions Taken:
 {memory.get_actions(max_chars_per_result=None)}
 
-Instructions:
-1. Review the query, image, and all actions taken during the process.
-2. Consider the results obtained from each tool execution.
-3. Incorporate the relevant information from the memory to generate the step-by-step final output.
-4. The final output should be consistent and coherent using the results from the tools.
-
-Output Structure:
-Your response should be well-organized and include the following sections:
-
-1. Summary:
-   - Provide a brief overview of the query and the main findings.
-
-2. Detailed Analysis:
-   - Break down the process of answering the query step-by-step.
-   - For each step, mention the tool used, its purpose, and the key results obtained.
-   - Explain how each step contributed to addressing the query.
-
-3. Key Findings:
-   - List the most important discoveries or insights gained from the analysis.
-   - Highlight any unexpected or particularly interesting results.
-
-4. Answer to the Query:
-   - Directly address the original question with a clear and concise answer.
-   - If the query has multiple parts, ensure each part is answered separately.
-
-5. Additional Insights (if applicable):
-   - Provide any relevant information or insights that go beyond the direct answer to the query.
-   - Discuss any limitations or areas of uncertainty in the analysis.
-
-6. Conclusion:
-   - Summarize the main points and reinforce the answer to the query.
-   - If appropriate, suggest potential next steps or areas for further investigation.
+Your response should be in the following format:
+Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
+Exact Answer: {{your succinct, final answer}}
+Confidence: {{your confidence score between 0% and 100% for your answer}}
 """
         else:
                 prompt_generate_final_output = f"""
@@ -351,9 +323,10 @@ Context:
 - **Query:** {question}
 - **Actions Taken:** {memory.get_actions(max_chars_per_result=None)}
 
-Instructions:
-1. Review the query and the results from all tool executions.
-2. Incorporate the relevant information to create a coherent, step-by-step final output.
+Your response should be in the following format:
+Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
+Exact Answer: {{your succinct, final answer}}
+Confidence: {{your confidence score between 0% and 100% for your answer}}
 """
 
         input_data = [prompt_generate_final_output]

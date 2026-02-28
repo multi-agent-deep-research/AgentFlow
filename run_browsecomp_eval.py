@@ -51,17 +51,6 @@ if browsecomp_path.exists():
 from agentflow.agentflow.solver import construct_solver
 
 
-# BrowseComp-Plus query template (from official browsecomp_eval.py)
-QUERY_TEMPLATE = """
-You are a deep research agent. You need to answer the given question by interacting with a search engine, using the search tool provided. Please perform reasoning and use the tool step by step, in an interleaved manner. You may use the search tool multiple times.
-
-Question: {Question}
-
-Your response should be in the following format:
-Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
-Exact Answer: {{your succinct, final answer}}
-Confidence: {{your confidence score between 0% and 100% for your answer}}
-""".strip()
 
 
 def extract_tool_call_counts(memory):
@@ -296,11 +285,9 @@ def run_evaluation(
             # Clear solver state from previous query
             solver.memory.reset()
 
-            # Wrap query with BrowseComp template for proper output format
-            formatted_query = QUERY_TEMPLATE.format(Question=query_text)
             print(f"\n[{query_id}] Query: {query_text[:100]}...")
             print(f"  Gold Answer: {gold_answer}")
-            result = solver.solve(formatted_query)
+            result = solver.solve(query_text)
 
             # Parse result - save both outputs for comparison with gold_answer
             final_output = result.get("final_output", "")
