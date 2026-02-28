@@ -9,6 +9,12 @@ class Memory:
         self.actions: Dict[str, Dict[str, Any]] = {}
         self._init_file_types()
 
+    def reset(self) -> None:
+        """Reset memory state for a new query."""
+        self.query = None
+        self.files = []
+        self.actions = {}
+
     def set_query(self, query: str) -> None:
         if not isinstance(query, str):
             raise TypeError("Query must be a string")
@@ -78,6 +84,21 @@ class Memory:
     def get_files(self) -> List[Dict[str, str]]:
         return self.files
     
-    def get_actions(self) -> Dict[str, Dict[str, Any]]:
-        return self.actions
+    def get_actions(self, max_chars_per_result: int = None) -> Dict[str, Dict[str, Any]]:
+        """Get actions, optionally truncating results to limit context size."""
+        if max_chars_per_result is None:
+            return self.actions
+
+        truncated_actions = {}
+        for step_name, action in self.actions.items():
+            truncated_action = action.copy()
+            result = action.get('result', '')
+            if isinstance(result, str) and len(result) > max_chars_per_result:
+                truncated_action['result'] = result[:max_chars_per_result] + f"\n... [truncated, {len(result) - max_chars_per_result} chars omitted]"
+            elif isinstance(result, dict):
+                result_str = str(result)
+                if len(result_str) > max_chars_per_result:
+                    truncated_action['result'] = result_str[:max_chars_per_result] + f"\n... [truncated, {len(result_str) - max_chars_per_result} chars omitted]"
+            truncated_actions[step_name] = truncated_action
+        return truncated_actions
     

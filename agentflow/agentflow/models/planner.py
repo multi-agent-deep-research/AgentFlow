@@ -133,7 +133,12 @@ Be biref and precise with insight.
             """
             Normalizes a tool name robustly using regular expressions.
             It handles any combination of spaces and underscores as separators.
+            Also strips backticks, quotes, and other common wrapper characters.
             """
+            # Strip markdown formatting, backticks, quotes, bullets, and whitespace
+            tool_name = tool_name.strip().strip('`').strip('"').strip("'").strip()
+            tool_name = re.sub(r'^[\s*\-•#>`]+', '', tool_name).strip().strip('`').strip()
+
             def to_canonical(name: str) -> str:
                 # Split the name by any sequence of one or more spaces or underscores
                 parts = re.split('[ _]+', name)
@@ -141,15 +146,17 @@ Be biref and precise with insight.
                 return "_".join(part.lower() for part in parts)
 
             normalized_input = to_canonical(tool_name)
-            
+
             for tool in self.available_tools:
                 if to_canonical(tool) == normalized_input:
                     return tool
-                    
+
             return f"No matched tool given: {tool_name}"
 
         try:
             if isinstance(response, str):
+                # Debug: print full response
+                print(f"DEBUG planner response:\n{response}")
                 # Attempt to parse the response as JSON
                 try:
                     response_dict = json.loads(response)
@@ -199,7 +206,7 @@ Tool Metadata:
 {self.toolbox_metadata}
 
 Previous Steps and Their Results:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=None)}
 
 Current Step: {step_count} in {max_step_count} steps
 Remaining Steps: {max_step_count - step_count}
@@ -263,7 +270,7 @@ Context:
 - **Query Analysis:** {query_analysis}
 - **Available Tools:** {self.available_tools}
 - **Toolbox Metadata:** {self.toolbox_metadata}
-- **Previous Steps:** {memory.get_actions()}
+- **Previous Steps:** {memory.get_actions(max_chars_per_result=None)}
 
 Instructions:
 1. Analyze the query, previous steps, and available tools.
@@ -301,40 +308,12 @@ Context:
 Query: {question}
 Image: {image_info}
 Actions Taken:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=None)}
 
-Instructions:
-1. Review the query, image, and all actions taken during the process.
-2. Consider the results obtained from each tool execution.
-3. Incorporate the relevant information from the memory to generate the step-by-step final output.
-4. The final output should be consistent and coherent using the results from the tools.
-
-Output Structure:
-Your response should be well-organized and include the following sections:
-
-1. Summary:
-   - Provide a brief overview of the query and the main findings.
-
-2. Detailed Analysis:
-   - Break down the process of answering the query step-by-step.
-   - For each step, mention the tool used, its purpose, and the key results obtained.
-   - Explain how each step contributed to addressing the query.
-
-3. Key Findings:
-   - List the most important discoveries or insights gained from the analysis.
-   - Highlight any unexpected or particularly interesting results.
-
-4. Answer to the Query:
-   - Directly address the original question with a clear and concise answer.
-   - If the query has multiple parts, ensure each part is answered separately.
-
-5. Additional Insights (if applicable):
-   - Provide any relevant information or insights that go beyond the direct answer to the query.
-   - Discuss any limitations or areas of uncertainty in the analysis.
-
-6. Conclusion:
-   - Summarize the main points and reinforce the answer to the query.
-   - If appropriate, suggest potential next steps or areas for further investigation.
+Your response should be in the following format:
+Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
+Exact Answer: {{your succinct, final answer}}
+Confidence: {{your confidence score between 0% and 100% for your answer}}
 """
         else:
                 prompt_generate_final_output = f"""
@@ -342,11 +321,12 @@ Task: Generate the final output based on the query and the results from all tool
 
 Context:
 - **Query:** {question}
-- **Actions Taken:** {memory.get_actions()}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=None)}
 
-Instructions:
-1. Review the query and the results from all tool executions.
-2. Incorporate the relevant information to create a coherent, step-by-step final output.
+Your response should be in the following format:
+Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
+Exact Answer: {{your succinct, final answer}}
+Confidence: {{your confidence score between 0% and 100% for your answer}}
 """
 
         input_data = [prompt_generate_final_output]
@@ -375,7 +355,7 @@ Image: {image_info}
 Initial Analysis:
 {self.query_analysis}
 Actions Taken:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=None)}
 
 Please generate the concise output based on the query, image information, initial analysis, and actions taken. Break down the process into clear, logical, and conherent steps. Conclude with a precise and direct answer to the query.
 
@@ -388,7 +368,7 @@ Task: Generate a concise final answer to the query based on all provided context
 Context:
 - **Query:** {question}
 - **Initial Analysis:** {self.query_analysis}
-- **Actions Taken:** {memory.get_actions()}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=None)}
 
 Instructions:
 1. Review the query and the results from all actions.

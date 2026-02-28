@@ -260,7 +260,7 @@ We provide a comprehensive logging to monitor training. See [logs.md](assets/doc
 
 
 
-## 🎯 AgentFlow Benchmark 
+## 🎯 AgentFlow Benchmark
 Serve the trained planner model with VLLM (here we deploy our [7B Flow-GRPO planner model](https://huggingface.co/AgentFlow/agentflow-planner-7b)):
 ```bash
 bash scripts/serve_vllm.sh
@@ -278,7 +278,126 @@ After running, each task folder (e.g., `test/bamboogle/`) will contain:
 - `logs/`: Contains detailed execution logs for each problem index (organized by model label).
 - `results/`: Contains the model's generated answers (`output_i.json`) and final evaluation scores (`finalscore_*.log`).
 
-You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md). 
+You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md).
+
+## 🔬 BrowseComp-Plus Evaluation
+
+[BrowseComp-Plus](https://github.com/texttron/BrowseComp-Plus) is a benchmark for evaluating Deep Research agents with a fixed corpus of ~100K curated documents. AgentFlow now supports evaluation on this benchmark.
+
+### Dependencies
+
+**For BM25 search (requires Java JDK):**
+```bash
+# Option 1: Install Java JDK 21 via conda (recommended)
+conda install -c conda-forge openjdk=21
+
+# Option 2: Install via system package manager
+sudo apt-get install -y openjdk-21-jdk
+
+# Set JVM path (if using conda)
+export JVM_PATH=$HOME/miniconda3/lib/jvm/lib/server/libjvm.so
+
+# Install Python packages
+pip install pyserini>=1.2.0
+pip install git+https://github.com/texttron/tevatron.git
+pip install qwen-omni-utils
+```
+
+**For FAISS search (no Java required):**
+```bash
+pip install faiss-cpu>=1.11.0.post1
+pip install git+https://github.com/texttron/tevatron.git
+pip install qwen-omni-utils
+```
+
+**Common dependencies (both BM25 and FAISS):**
+```bash
+pip install datasets>=4.0.0 tqdm>=4.67.1
+```
+
+**Quick install (all at once):**
+```bash
+pip install -r requirements-browsecomp.txt
+# Then install Java (for BM25) or tevatron dependencies:
+conda install -c conda-forge openjdk=21  # for BM25 only
+pip install git+https://github.com/texttron/tevatron.git qwen-omni-utils
+```
+
+### Setup
+
+1. **Download BrowseComp-Plus** (if not already present):
+```bash
+# Clone BrowseComp-Plus in the parent directory
+cd ..
+git clone https://github.com/texttron/BrowseComp-Plus.git
+cd AgentFlow
+```
+
+2. **Download the index**:
+```bash
+cd ../BrowseComp-Plus
+bash scripts_build_index/download_indexes.sh
+cd ../AgentFlow
+```
+
+3. **Decrypt queries**:
+```bash
+cd ../BrowseComp-Plus
+python scripts_build_index/decrypt_dataset.py \
+    --output data/browsecomp_plus_decrypted.jsonl \
+    --generate-tsv topics-qrels/queries.tsv
+cd ../AgentFlow
+```
+
+### Run Evaluation (Test with few samples)
+
+```bash
+# Test with just 5 queries
+python -m agentflow.evaluations browsecomp \
+    --index-path ../BrowseComp-Plus/indexes/bm25_index \
+    --index-type bm25 \
+    --output-dir runs/agentflow_browsecomp_test \
+    --num-queries 5 \
+    --max-steps 3
+```
+
+### Run Full Evaluation
+
+```bash
+python -m agentflow.evaluations browsecomp \
+    --index-path ../BrowseComp-Plus/indexes/bm25_index \
+    --index-type bm25 \
+    --output-dir runs/agentflow_browsecomp \
+    --max-steps 3
+```
+
+### Format Results for Leaderboard
+
+```bash
+python -m agentflow.evaluations browsecomp \
+    --format-only \
+    --output-dir runs/agentflow_browsecomp \
+    --retriever-name "AgentFlow-BM25" \
+    --link "https://github.com/multi-agent-deep-research/AgentFlow"
+```
+
+### Using BrowseComp-Plus as a Tool
+
+You can also use BrowseComp-Plus search as a tool during training/inference:
+
+```python
+from agentflow.tools.browsecomp_search import BrowseComp_Search_Tool
+
+# Initialize the tool
+tool = BrowseComp_Search_Tool(
+    index_type="bm25",
+    index_path="../BrowseComp-Plus/indexes/bm25_index",
+    k=5
+)
+
+# Search
+results = tool.execute(query="What is the capital of France?")
+``` 
 
 ## 🧩 Use Your Own Model in AgentFlow
 
