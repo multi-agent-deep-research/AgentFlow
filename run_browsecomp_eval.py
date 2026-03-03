@@ -50,14 +50,190 @@ if browsecomp_path.exists():
 
 from agentflow.agentflow.solver import construct_solver
 
+# Judge prompt from BrowseComp-Plus (search_agent/prompts.py)
+GRADER_TEMPLATE = """
+Judge whether the following [response] to [question] is correct or not based on the precise and unambiguous [correct_answer] below.
 
+[question]: {question}
+
+[response]: {response}
+
+Your judgement must be in the format and criteria specified below:
+
+extracted_final_answer: The final exact answer extracted from the [response]. Put the extracted answer as 'None' if there is no exact, final answer to extract from the response.
+
+[correct_answer]: {correct_answer}
+
+reasoning: Explain why the extracted_final_answer is correct or incorrect based on [correct_answer], focusing only on if there are meaningful differences between [correct_answer] and the extracted_final_answer. Do not comment on any background to the problem, do not attempt to solve the problem, do not argue for any answer different than [correct_answer], focus only on whether the answers match.
+
+correct: Answer 'yes' if extracted_final_answer matches the [correct_answer] given above, or is within a small margin of error for numerical problems. Answer 'no' otherwise, i.e. if there if there is any inconsistency, ambiguity, non-equivalency, or if the extracted answer is incorrect.
+
+confidence: The extracted confidence score between 0|%| and 100|%| from [response]. Put 100 if there is no confidence score available.
+""".strip()
+
+
+def parse_judge_response(judge_response):
+    """Parse structured judge response into fields."""
+    result = {
+        "extracted_final_answer": None,
+        "reasoning": None,
+        "correct": None,
+        "confidence": None,
+        "parse_error": False,
+    }
+    if not judge_response:
+        result["parse_error"] = True
+        return result
+
+    # Extract extracted_final_answer
+    for pattern in [
+        r"\*\*extracted_final_answer:\*\*\s*(.*?)(?=\n|$)",
+        r"\*\*extracted_final_answer\*\*:\s*(.*?)(?=\n|$)",
+        r"extracted_final_answer:\s*(.*?)(?=\n|$)",
+    ]:
+        m = re.search(pattern, judge_response, re.IGNORECASE | re.DOTALL)
+        if m:
+            result["extracted_final_answer"] = m.group(1).strip()
+            break
+
+    # Extract reasoning
+    for pattern in [
+        r"\*\*reasoning:\*\*\s*(.*?)(?=\n\*\*correct:\*\*|\n\*\*correct\*\*:|\ncorrect:|$)",
+        r"\*\*reasoning\*\*:\s*(.*?)(?=\n\*\*correct:\*\*|\n\*\*correct\*\*:|\ncorrect:|$)",
+        r"reasoning:\s*(.*?)(?=\ncorrect:|$)",
+    ]:
+        m = re.search(pattern, judge_response, re.IGNORECASE | re.DOTALL)
+        if m:
+            result["reasoning"] = m.group(1).strip()
+            break
+
+    # Extract correct (yes/no)
+    for pattern in [
+        r"\*\*correct:\*\*\s*(yes|no)",
+        r"\*\*correct\*\*:\s*(yes|no)",
+        r"correct:\s*(yes|no)",
+    ]:
+        m = re.search(pattern, judge_response, re.IGNORECASE)
+        if m:
+            result["correct"] = m.group(1).lower() == "yes"
+            break
+
+    # Extract confidence
+    for pattern in [
+        r"\*\*confidence:\*\*\s*(\d+(?:\.\d+)?)\s*%?",
+        r"\*\*confidence\*\*:\s*(\d+(?:\.\d+)?)\s*%?",
+        r"confidence:\s*(\d+(?:\.\d+)?)\s*%?",
+    ]:
+        m = re.search(pattern, judge_response, re.IGNORECASE)
+        if m:
+            result["confidence"] = min(float(m.group(1)), 100.0)
+            break
+
+    if result["correct"] is None:
+        result["parse_error"] = True
+
+    return result
+
+
+def run_judge_evaluation(results, output_path, judge_model="openai/gpt-4.1"):
+    """Run LLM-as-judge evaluation on completed results using OpenRouter."""
+    import openai
+
+    completed_results = [r for r in results if r.get("status") == "completed"]
+    if not completed_results:
+        print("\nNo completed results to judge.")
+        return {}
+
+    print("\n" + "=" * 70)
+    print(f"LLM Judge Evaluation ({judge_model})")
+    print("=" * 70)
+    print(f"Judging {len(completed_results)} completed results...")
+
+    client = openai.OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+    )
+
+    judge_results = []
+    correct_count = 0
+
+    for r in tqdm(completed_results, desc="Judging"):
+        query_id = r["query_id"]
+        response_text = r.get("result", [{}])[-1].get("output", "")
+        gold_answer = r.get("gold_answer", "")
+
+        # Build the judge prompt
+        # Use the query text from the result if available, otherwise reconstruct
+        query_text = r.get("query_text", "")
+        if not query_text:
+            # The query text isn't stored separately, use what we have
+            # For loaded queries, we stored gold_answer but not query; use response context
+            query_text = "(see response for context)"
+
+        judge_prompt = GRADER_TEMPLATE.format(
+            question=query_text, response=response_text, correct_answer=gold_answer
+        )
+
+        try:
+            response = client.chat.completions.create(
+                model=judge_model,
+                messages=[{"role": "user", "content": judge_prompt}],
+                max_tokens=1024,
+            )
+            judge_text = response.choices[0].message.content or ""
+        except Exception as e:
+            print(f"  [{query_id}] Judge error: {e}")
+            judge_text = ""
+
+        parsed = parse_judge_response(judge_text)
+        is_correct = parsed.get("correct", False)
+        if is_correct:
+            correct_count += 1
+
+        judge_obj = {
+            "query_id": query_id,
+            "judge_response": judge_text,
+            "judge_result": parsed,
+            "gold_answer": gold_answer,
+        }
+        judge_results.append(judge_obj)
+
+        status = "CORRECT" if is_correct else ("INCORRECT" if parsed["correct"] is not None else "PARSE_ERROR")
+        print(f"  [{query_id}] {status} | extracted: {parsed.get('extracted_final_answer', 'N/A')[:80]} | gold: {gold_answer[:80]}")
+
+    # Summary
+    total = len(completed_results)
+    accuracy = correct_count / total if total > 0 else 0
+    parse_errors = sum(1 for j in judge_results if j["judge_result"].get("parse_error"))
+
+    print(f"\n{'=' * 70}")
+    print(f"Judge Results ({judge_model}):")
+    print(f"  Accuracy: {correct_count}/{total} ({accuracy * 100:.1f}%)")
+    print(f"  Parse errors: {parse_errors}/{total}")
+    print(f"{'=' * 70}")
+
+    # Save judge results
+    judge_summary = {
+        "judge_model": judge_model,
+        "total_judged": total,
+        "correct": correct_count,
+        "accuracy": accuracy,
+        "parse_errors": parse_errors,
+        "per_query": judge_results,
+    }
+    judge_path = output_path / "judge_results.json"
+    with open(judge_path, "w") as f:
+        json.dump(judge_summary, f, indent=2)
+    print(f"Judge results saved to: {judge_path}")
+
+    return judge_summary
 
 
 def extract_tool_call_counts(memory):
     """Extract tool call counts from solver memory.
 
     Maps tool names to BrowseComp-Plus conventions:
-    - BrowseComp_Search_Tool -> "search"
+    - Web_Search_Tool (BrowseComp search) -> "search"
     - Generator tools -> "generate"
     """
     counts = defaultdict(int)
@@ -71,7 +247,7 @@ def extract_tool_call_counts(memory):
 
 
 def extract_retrieved_docids(memory):
-    """Extract all unique docids retrieved by BrowseComp_Search_Tool from solver memory."""
+    """Extract all unique docids retrieved by Web_Search_Tool from solver memory."""
     docids = set()
     for step_name, action in memory.items():
         if "search" not in action.get("tool_name", "").lower():
@@ -140,6 +316,7 @@ def run_evaluation(
     max_steps=3,
     planner_model="vllm-AgentFlow/agentflow-planner-7b",
     openrouter_model="litellm-openrouter/qwen/qwen-2.5-7b-instruct",
+    judge_model="openai/gpt-4.1",
     random_sample=False,
     seed=42,
 ):
@@ -189,6 +366,7 @@ def run_evaluation(
         config={
             "planner_model": planner_model,
             "openrouter_model": openrouter_model,
+            "judge_model": judge_model,
             "max_steps": max_steps,
             "num_queries": num_queries or 830,
             "output_dir": str(output_path),
@@ -215,6 +393,7 @@ def run_evaluation(
     print("=" * 70)
     print(f"Planner: {planner_model} @ {vllm_base_url}")
     print(f"Verifier/Executor: {openrouter_model}")
+    print(f"Judge: {judge_model}")
     print(f"Output dir: {output_path}")
     print(f"Max queries: {num_queries or 'all (830)'}")
     print(f"Max steps: {max_steps}")
@@ -234,7 +413,9 @@ def run_evaluation(
         openrouter_model,   # executor - OpenRouter
     ]
 
-    # Tools: BrowseComp_Search_Tool + Base_Generator_Tool
+    # Tools: Web_Search_Tool (browsecomp_search) + Base_Generator_Tool
+    # BrowseComp_Search_Tool is the class name -> maps to browsecomp_search dir
+    # The tool reports itself as Web_Search_Tool to match planner's training
     enabled_tools = ["Base_Generator_Tool", "BrowseComp_Search_Tool"]
     tool_engine = [openrouter_model, "Default"]  # Generator uses OpenRouter, BrowseComp uses Default
 
@@ -282,8 +463,13 @@ def run_evaluation(
 
         # Run query
         try:
-            # Clear solver state from previous query
+            # Clear solver state and CUDA cache from previous query
             solver.memory.reset()
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                import gc
+                gc.collect()
 
             print(f"\n[{query_id}] Query: {query_text[:100]}...")
             print(f"  Gold Answer: {gold_answer}")
@@ -301,6 +487,7 @@ def run_evaluation(
             # Extra fields (gold_answer, final_output, etc.) are preserved but ignored by evaluate_run.py
             result_obj = {
                 "query_id": query_id,
+                "query_text": query_text,
                 "tool_call_counts": extract_tool_call_counts(memory_actions),
                 "status": "completed" if output_text else "failed",
                 "retrieved_docids": extract_retrieved_docids(memory_actions),
@@ -322,6 +509,7 @@ def run_evaluation(
             print(f"  ERROR: {e}")
             result_obj = {
                 "query_id": query_id,
+                "query_text": query_text,
                 "tool_call_counts": {},
                 "status": "error",
                 "retrieved_docids": [],
@@ -377,12 +565,26 @@ def run_evaluation(
     print(f"  python BrowseComp-Plus/scripts_evaluation/evaluate_run.py --input_dir {output_path}")
     print(f"\nLeaderboard: https://huggingface.co/spaces/Tevatron/BrowseComp-Plus")
 
+    # Run LLM judge evaluation
+    judge_summary = run_judge_evaluation(results, output_path, judge_model=judge_model)
+
+    # Add judge metrics to summary
+    if judge_summary:
+        summary["judge_model"] = judge_summary.get("judge_model", "")
+        summary["judge_accuracy"] = judge_summary.get("accuracy", 0)
+        summary["judge_correct"] = judge_summary.get("correct", 0)
+        # Re-save summary with judge results
+        with open(output_path / "summary.json", "w") as f:
+            json.dump(summary, f, indent=2)
+
     # Log final summary to wandb
     wandb.log({
         "final/total_queries": summary["total_queries"],
         "final/completed": summary["completed"],
         "final/failed": summary["failed"],
         "final/completion_rate": summary["completion_rate"],
+        "final/judge_accuracy": summary.get("judge_accuracy", 0),
+        "final/judge_correct": summary.get("judge_correct", 0),
     })
 
     # Upload all result files to wandb
@@ -442,6 +644,11 @@ def main():
         help="Model for verifier/executor (OpenRouter via LiteLLM)"
     )
     parser.add_argument(
+        "--judge-model",
+        default="openai/gpt-4.1",
+        help="Model for LLM judge evaluation (OpenRouter, default: openai/gpt-4.1)"
+    )
+    parser.add_argument(
         "--random",
         action="store_true",
         default=False,
@@ -470,6 +677,7 @@ def main():
         max_steps=args.max_steps,
         planner_model=args.planner_model,
         openrouter_model=args.openrouter_model,
+        judge_model=args.judge_model,
         random_sample=args.random,
         seed=args.seed,
     )

@@ -30,7 +30,7 @@ from agentflow.tools.base import BaseTool
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-TOOL_NAME = "BrowseComp_Search_Tool"
+TOOL_NAME = "Web_Search_Tool"
 
 LIMITATIONS = """
 1. This tool searches a fixed corpus of ~100K documents (not the live web).
@@ -98,7 +98,7 @@ class BrowseComp_Search_Tool(BaseTool):
     Attributes:
         index_type: Type of index ("bm25" or "faiss")
         index_path: Path to the pre-built index
-        snippet_max_tokens: Maximum tokens for document snippets (None = full text)
+        max_chars_per_result: Maximum characters per result snippet (None = full text)
         k: Number of results to return
         include_get_document: Whether to include get_document functionality
 
@@ -111,11 +111,7 @@ class BrowseComp_Search_Tool(BaseTool):
         self,
         index_type: Optional[str] = None,
         index_path: Optional[str] = None,
-        # From BrowseComp-Plus paper: "The retriever tool is set to retrieve the top k=5 search results,
-        # where each result is truncated to the first 512 tokens of the corresponding document.
-        # This truncation is due to budget constraints, which prevent us from providing full document content."
-        # Reference: https://arxiv.org/abs/2501.12959
-        snippet_max_tokens: Optional[int] = 512,
+        max_chars_per_result: Optional[int] = 512,
         k: int = 5,
         include_get_document: bool = True,
     ):
@@ -125,7 +121,7 @@ class BrowseComp_Search_Tool(BaseTool):
         Args:
             index_type: Type of index ("bm25" or "faiss")
             index_path: Path to the pre-built index directory
-            snippet_max_tokens: Maximum tokens for snippets (None for full text)
+            max_chars_per_result: Maximum characters per result snippet (None for full text)
             k: Number of search results to return
             include_get_document: Whether to support get_document functionality
         """
@@ -152,9 +148,8 @@ class BrowseComp_Search_Tool(BaseTool):
         super().__init__(
             tool_name=TOOL_NAME,
             tool_description=(
-                f"A search tool for the BrowseComp-Plus benchmark corpus "
-                f"(~100K curated documents). Returns top-{k} relevant documents "
-                f"with docid, score, and snippet using {index_type.upper()} retrieval."
+                f"A web search tool that retrieves relevant documents from a curated corpus. "
+                f"Returns top-{k} relevant documents with docid, score, and snippet."
             ),
             tool_version="1.0.0",
             input_types={
@@ -181,7 +176,7 @@ class BrowseComp_Search_Tool(BaseTool):
 
         self.index_type = index_type.lower()
         self.index_path = index_path
-        self.snippet_max_tokens = snippet_max_tokens
+        self.max_chars_per_result = max_chars_per_result
         self.k = k
         self.include_get_document = include_get_document
 
@@ -233,8 +228,10 @@ class BrowseComp_Search_Tool(BaseTool):
         try:
             results = self.searcher.search(query, k)
         except Exception as e:
-            logger.error(f"Search failed: {e}")
-            return f"Search failed: {str(e)}"
+            import traceback
+            tb = traceback.format_exc()
+            logger.error(f"Search failed for query '{query[:100]}': {type(e).__name__}: {e}\n{tb}")
+            return f"Search failed: {type(e).__name__}: {e}"
 
         if not results:
             return "No results found."
@@ -247,8 +244,8 @@ class BrowseComp_Search_Tool(BaseTool):
             snippet = result.get("snippet", result.get("text", ""))
 
             # Truncate snippet if needed
-            if self.snippet_max_tokens and snippet:
-                snippet = self._truncate_by_tokens(snippet, self.snippet_max_tokens)
+            if self.max_chars_per_result and snippet and len(snippet) > self.max_chars_per_result:
+                snippet = snippet[:self.max_chars_per_result] + "..."
 
             line = f"{idx}. [DocID: {docid}] (Score: {score:.2f})\n   {snippet}"
             lines.append(line)
@@ -269,14 +266,6 @@ class BrowseComp_Search_Tool(BaseTool):
             raise NotImplementedError("get_document is not enabled for this tool instance.")
 
         return self.searcher.get_document(docid)
-
-    def _truncate_by_tokens(self, text: str, max_tokens: int) -> str:
-        """Truncate text to approximately max_tokens using simple tokenization."""
-        # Simple word-based truncation (approximately token-based)
-        words = text.split()
-        if len(words) <= max_tokens:
-            return text
-        return " ".join(words[:max_tokens]) + "..."
 
     def get_metadata(self) -> Dict[str, Any]:
         """Get tool metadata including searcher information."""

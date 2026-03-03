@@ -206,7 +206,7 @@ Tool Metadata:
 {self.toolbox_metadata}
 
 Previous Steps and Their Results:
-{memory.get_actions(max_chars_per_result=None)}
+{memory.get_actions(max_chars_per_result=512)}
 
 Current Step: {step_count} in {max_step_count} steps
 Remaining Steps: {max_step_count - step_count}
@@ -270,7 +270,7 @@ Context:
 - **Query Analysis:** {query_analysis}
 - **Available Tools:** {self.available_tools}
 - **Toolbox Metadata:** {self.toolbox_metadata}
-- **Previous Steps:** {memory.get_actions(max_chars_per_result=None)}
+- **Previous Steps:** {memory.get_actions(max_chars_per_result=512)}
 
 Instructions:
 1. Analyze the query, previous steps, and available tools.
@@ -308,7 +308,7 @@ Context:
 Query: {question}
 Image: {image_info}
 Actions Taken:
-{memory.get_actions(max_chars_per_result=None)}
+{memory.get_actions(max_chars_per_result=512)}
 
 Your response should be in the following format:
 Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
@@ -321,7 +321,7 @@ Task: Generate the final output based on the query and the results from all tool
 
 Context:
 - **Query:** {question}
-- **Actions Taken:** {memory.get_actions(max_chars_per_result=None)}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=512)}
 
 Your response should be in the following format:
 Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
@@ -355,7 +355,7 @@ Image: {image_info}
 Initial Analysis:
 {self.query_analysis}
 Actions Taken:
-{memory.get_actions(max_chars_per_result=None)}
+{memory.get_actions(max_chars_per_result=512)}
 
 Please generate the concise output based on the query, image information, initial analysis, and actions taken. Break down the process into clear, logical, and conherent steps. Conclude with a precise and direct answer to the query.
 
@@ -368,7 +368,7 @@ Task: Generate a concise final answer to the query based on all provided context
 Context:
 - **Query:** {question}
 - **Initial Analysis:** {self.query_analysis}
-- **Actions Taken:** {memory.get_actions(max_chars_per_result=None)}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=512)}
 
 Instructions:
 1. Review the query and the results from all actions.

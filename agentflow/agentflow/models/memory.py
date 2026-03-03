@@ -1,5 +1,8 @@
 from typing import Dict, Any, List, Union, Optional
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Memory:
 
@@ -90,15 +93,20 @@ class Memory:
             return self.actions
 
         truncated_actions = {}
+        truncated_count = 0
         for step_name, action in self.actions.items():
             truncated_action = action.copy()
             result = action.get('result', '')
             if isinstance(result, str) and len(result) > max_chars_per_result:
                 truncated_action['result'] = result[:max_chars_per_result] + f"\n... [truncated, {len(result) - max_chars_per_result} chars omitted]"
+                truncated_count += 1
             elif isinstance(result, dict):
                 result_str = str(result)
                 if len(result_str) > max_chars_per_result:
                     truncated_action['result'] = result_str[:max_chars_per_result] + f"\n... [truncated, {len(result_str) - max_chars_per_result} chars omitted]"
+                    truncated_count += 1
             truncated_actions[step_name] = truncated_action
+        if truncated_count > 0:
+            print(f"[Memory] Truncated {truncated_count}/{len(self.actions)} action results to max_chars_per_result={max_chars_per_result}")
         return truncated_actions
     

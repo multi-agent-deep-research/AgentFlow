@@ -207,6 +207,15 @@ execution = tool.execute(query=["Methanol", "function of hyperbola", "Fermat's L
 
             # Split the command into blocks, execute each one and store execution results
             command_blocks = split_commands(command)
+
+            if not command_blocks:
+                # Fallback: try splitting on consecutive tool.execute calls
+                fallback_blocks = re.split(r'(?<=\))(?=\s*execution\s*=)', command)
+                command_blocks = [b.strip() for b in fallback_blocks if b.strip()]
+
+            if not command_blocks:
+                return f"Error in execute_tool_command: could not parse command blocks from: {command[:200]}"
+
             executions = []
 
             for block in command_blocks:
@@ -224,4 +233,6 @@ execution = tool.execute(query=["Methanol", "function of hyperbola", "Fermat's L
             # Return all the execution results
             return executions
         except Exception as e:
-            return f"Error in execute_tool_command: {str(e)}"
+            import traceback
+            tb = traceback.format_exc()
+            return f"Error in execute_tool_command: {str(e)}\nCommand: {command[:300]}\n{tb}"
