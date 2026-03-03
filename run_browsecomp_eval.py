@@ -6,26 +6,24 @@ Two modes are supported:
 
 1. HYBRID mode (default):
    - Planner: local vLLM with AgentFlow/agentflow-planner-7b
-   - Verifier/Executor/Generator: OpenRouter qwen/qwen-2.5-7b-instruct
+   - Verifier/Executor/Generator: specified via --service/--model
 
    Setup:
        vllm serve AgentFlow/agentflow-planner-7b --port 8000
        export VLLM_BASE_URL=http://localhost:8000/v1
-       export OPENROUTER_API_KEY=your_key
-       python run_browsecomp_eval.py --num-queries 10
+       export DEEPINFRA_API_KEY=your_key   # or OPENROUTER_API_KEY
+       python run_browsecomp_eval.py --service deepinfra --model zai-org/GLM-4.7-Flash --num-queries 10
 
-2. UNIFIED mode (--unified-model):
+2. UNIFIED mode (--unified):
    - All components use a single model via LiteLLM (no local vLLM needed)
 
    Setup:
-       export DEEPINFRA_API_KEY=your_key   # or OPENROUTER_API_KEY, etc.
-       python run_browsecomp_eval.py --unified-model litellm-deepinfra/gpt-oss-120b --num-queries 10
+       export DEEPINFRA_API_KEY=your_key   # or OPENROUTER_API_KEY
+       python run_browsecomp_eval.py --unified --service deepinfra --model gpt-oss-120b --num-queries 10
 
-   Supported providers (via LiteLLM):
-       - litellm-deepinfra/MODEL_NAME   (DeepInfra)
-       - litellm-openrouter/MODEL_NAME  (OpenRouter)
-       - litellm-together_ai/MODEL_NAME (Together AI)
-       - gpt-4o, gpt-4.1, etc.         (OpenAI directly)
+   Supported services:
+       - deepinfra   (DeepInfra)
+       - openrouter  (OpenRouter)
 """
 
 import argparse
@@ -264,11 +262,12 @@ def run_evaluation(
     num_queries=None,
     max_steps=3,
     planner_model="vllm-AgentFlow/agentflow-planner-7b",
-    openrouter_model="litellm-openrouter/qwen/qwen-2.5-7b-instruct",
+    service="openrouter",
+    model="qwen/qwen-2.5-7b-instruct",
     judge_model="openai/gpt-4.1",
     random_sample=False,
     seed=42,
-    unified_model=None,
+    unified=False,
 ):
     """
     Run evaluation on BrowseComp-Plus.
@@ -277,9 +276,11 @@ def run_evaluation(
         output_dir: Base directory for eval logs
         num_queries: Number of queries to evaluate (None = all)
         max_steps: Maximum steps per query
-        planner_model: Model for planner (vLLM local) — ignored when unified_model is set
-        openrouter_model: Model for verifier/executor (OpenRouter) — ignored when unified_model is set
-        unified_model: If set, use this single model for ALL components (e.g. "litellm-deepinfra/gpt-oss-120b")
+        planner_model: Model for planner (vLLM local) — ignored when unified is True
+        service: API service for non-planner components ('deepinfra' or 'openrouter')
+        model: Model name on the service (e.g. 'zai-org/GLM-4.7-Flash')
+        judge_model: Model for LLM judge
+        unified: If True, use service/model for ALL components including planner
     """
     # Create timestamped output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -307,28 +308,29 @@ def run_evaluation(
     sys.stdout = tee
     sys.stderr = tee
 
-    # Determine mode: unified (single model) vs hybrid (vLLM planner + OpenRouter)
-    is_unified = unified_model is not None
-    if is_unified:
-        planner_model = unified_model
-        openrouter_model = unified_model
+    # Construct the API model string from service + model
+    api_model = f"litellm-{service}/{model}"
+
+    # Determine mode: unified (single model) vs hybrid (vLLM planner + API model)
+    if unified:
+        planner_model = api_model
 
     # Initialize wandb with custom server
     os.environ["WANDB_BASE_URL"] = "https://wandb-radfan.ru"
     os.environ["WANDB_API_KEY"] = os.environ.get("WANDB_API_KEY", "local-6bd76c2bceb4dc4b88016f4581c0327305ea08c2")
 
     wandb_config = {
-        "mode": "unified" if is_unified else "hybrid",
+        "mode": "unified" if unified else "hybrid",
         "planner_model": planner_model,
-        "openrouter_model": openrouter_model,
+        "api_model": api_model,
+        "service": service,
+        "model": model,
         "judge_model": judge_model,
         "max_steps": max_steps,
         "num_queries": num_queries or 830,
         "output_dir": str(output_path),
         "timestamp": timestamp,
     }
-    if is_unified:
-        wandb_config["unified_model"] = unified_model
 
     wandb.init(
         entity="multiagent-deepresearch-improvement",
@@ -339,31 +341,38 @@ def run_evaluation(
 
     # Set up environment based on mode
     vllm_base_url = None
-    if is_unified:
+    import litellm
+    if unified:
         # Unified mode: no local vLLM needed
-        import litellm
+        pass
     else:
-        # Hybrid mode: local vLLM for planner + OpenRouter for other components
+        # Hybrid mode: local vLLM for planner + API service for other components
         vllm_base_url = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")
 
-        if "OPENROUTER_API_KEY" not in os.environ:
-            print("Warning: OPENROUTER_API_KEY not set. Set it with:")
-            print("  export OPENROUTER_API_KEY=your_key")
-            print("Continuing anyway (will fail if key is required)...")
+        # Only set litellm.api_base for openrouter (deepinfra uses litellm's built-in routing)
+        if service == "openrouter":
+            litellm.api_base = "https://openrouter.ai/api/v1"
 
-        # Configure LiteLLM for OpenRouter
-        import litellm
-        litellm.api_base = "https://openrouter.ai/api/v1"
+    # Check for required API keys
+    if service == "deepinfra" and "DEEPINFRA_API_KEY" not in os.environ:
+        print("Warning: DEEPINFRA_API_KEY not set. Set it with:")
+        print("  export DEEPINFRA_API_KEY=your_key")
+        print("Continuing anyway (will fail if key is required)...")
+    elif service == "openrouter" and "OPENROUTER_API_KEY" not in os.environ:
+        print("Warning: OPENROUTER_API_KEY not set. Set it with:")
+        print("  export OPENROUTER_API_KEY=your_key")
+        print("Continuing anyway (will fail if key is required)...")
 
     print("=" * 70)
     print("BrowseComp-Plus Evaluation with AgentFlow")
-    print(f"Mode: {'UNIFIED' if is_unified else 'HYBRID'}")
+    print(f"Mode: {'UNIFIED' if unified else 'HYBRID'}")
+    print(f"Service: {service}")
     print("=" * 70)
-    if is_unified:
-        print(f"Model (all components): {unified_model}")
+    if unified:
+        print(f"Model (all components): {api_model}")
     else:
         print(f"Planner: {planner_model} @ {vllm_base_url}")
-        print(f"Verifier/Executor: {openrouter_model}")
+        print(f"Verifier/Executor: {api_model}")
     print(f"Judge: {judge_model}")
     print(f"Output dir: {output_path}")
     print(f"Max queries: {num_queries or 'all (830)'}")
@@ -378,17 +387,17 @@ def run_evaluation(
     # Construct solver
     # model_engine: [planner_main, planner_fixed, verifier, executor]
     model_engine = [
-        planner_model,      # planner_main
-        planner_model,      # planner_fixed
-        openrouter_model,   # verifier
-        openrouter_model,   # executor
+        planner_model,   # planner_main
+        planner_model,   # planner_fixed
+        api_model,       # verifier
+        api_model,       # executor
     ]
 
     # Tools: Web_Search_Tool (browsecomp_search) + Base_Generator_Tool
     # BrowseComp_Search_Tool is the class name -> maps to browsecomp_search dir
     # The tool reports itself as Web_Search_Tool to match planner's training
     enabled_tools = ["Base_Generator_Tool", "BrowseComp_Search_Tool"]
-    tool_engine = [openrouter_model, "Default"]  # Generator uses model, BrowseComp uses Default
+    tool_engine = [api_model, "Default"]  # Generator uses model, BrowseComp uses Default
 
     print(f"\nInitializing solver...")
     print(f"  model_engine: {model_engine}")
@@ -407,30 +416,30 @@ def run_evaluation(
         temperature=0.0,
     )
     # Only pass base_url when using local vLLM (hybrid mode)
-    if vllm_base_url:
+    if not unified and vllm_base_url:
         solver_kwargs["base_url"] = vllm_base_url
     # In unified mode, cap output tokens per LLM call to stay within context window
-    if is_unified:
+    if unified:
         solver_kwargs["max_output_tokens"] = 4096
 
     solver = construct_solver(**solver_kwargs)
 
-    # Initialize judge client
+    # Initialize judge client based on service
     import openai as _openai
-    if is_unified:
-        # Unified mode: use DeepInfra for judge
-        if not judge_model or judge_model == "openai/gpt-4.1":
+    if service == "deepinfra":
+        if judge_model == "openai/gpt-4.1":
             judge_model = "deepseek-ai/DeepSeek-V3"
         judge_client = _openai.OpenAI(
             base_url="https://api.deepinfra.com/v1/openai",
             api_key=os.environ.get("DEEPINFRA_API_KEY", ""),
         )
         print(f"Judge: {judge_model} via DeepInfra")
-    else:
+    elif service == "openrouter":
         judge_client = _openai.OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=os.environ.get("OPENROUTER_API_KEY", ""),
         )
+        print(f"Judge: {judge_model} via OpenRouter")
 
     # Run evaluation
     results = []
@@ -579,7 +588,9 @@ def run_evaluation(
         "failed": failed,
         "completion_rate": completed / len(queries) if queries else 0,
         "planner_model": planner_model,
-        "openrouter_model": openrouter_model,
+        "api_model": api_model,
+        "service": service,
+        "model": model,
         "judge_model": judge_model,
         "judge_accuracy": judge_accuracy,
         "judge_correct": judge_correct,
@@ -661,28 +672,31 @@ def main():
         help="Maximum steps per query"
     )
     parser.add_argument(
-        "--planner-model",
-        default="vllm-AgentFlow/agentflow-planner-7b",
-        help="Model for planner (vLLM local)"
+        "--service",
+        choices=["deepinfra", "openrouter"],
+        default="openrouter",
+        help="API service for non-planner components (default: openrouter)"
     )
     parser.add_argument(
-        "--openrouter-model",
-        default="litellm-openrouter/qwen/qwen-2.5-7b-instruct",
-        help="Model for verifier/executor (OpenRouter via LiteLLM)"
+        "--model",
+        default="qwen/qwen-2.5-7b-instruct",
+        help="Model name on the service (e.g. zai-org/GLM-4.7-Flash)"
+    )
+    parser.add_argument(
+        "--planner-model",
+        default="vllm-AgentFlow/agentflow-planner-7b",
+        help="Model for planner (vLLM local, ignored when --unified is set)"
     )
     parser.add_argument(
         "--judge-model",
         default="openai/gpt-4.1",
-        help="Model for LLM judge evaluation (OpenRouter, default: openai/gpt-4.1)"
+        help="Model for LLM judge evaluation (default: openai/gpt-4.1)"
     )
     parser.add_argument(
-        "--unified-model",
-        default=None,
-        help=(
-            "Use a single model for ALL components (planner, verifier, executor, generator). "
-            "Overrides --planner-model and --openrouter-model. "
-            "Example: --unified-model litellm-deepinfra/gpt-oss-120b"
-        ),
+        "--unified",
+        action="store_true",
+        default=False,
+        help="Use --service/--model for ALL components including planner (no vLLM needed)"
     )
     parser.add_argument(
         "--random",
@@ -699,27 +713,26 @@ def main():
 
     args = parser.parse_args()
 
-    # Check environment based on mode
-    if args.unified_model:
-        print(f"Unified mode: using {args.unified_model} for all components")
+    # Construct and display model string
+    api_model = f"litellm-{args.service}/{args.model}"
+    if args.unified:
+        print(f"Unified mode: using {api_model} for all components")
     else:
+        print(f"Hybrid mode: planner={args.planner_model}, api={api_model}")
         if not os.environ.get("VLLM_BASE_URL"):
             print("Warning: VLLM_BASE_URL not set, using default http://localhost:8000/v1")
-
-        if not os.environ.get("OPENROUTER_API_KEY"):
-            print("Warning: OPENROUTER_API_KEY not set")
-            print("Set it with: export OPENROUTER_API_KEY=your_key")
 
     run_evaluation(
         output_dir=args.output_dir,
         num_queries=args.num_queries,
         max_steps=args.max_steps,
         planner_model=args.planner_model,
-        openrouter_model=args.openrouter_model,
+        service=args.service,
+        model=args.model,
         judge_model=args.judge_model,
         random_sample=args.random,
         seed=args.seed,
-        unified_model=args.unified_model,
+        unified=args.unified,
     )
 
 
