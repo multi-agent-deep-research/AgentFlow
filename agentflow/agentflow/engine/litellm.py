@@ -328,14 +328,14 @@ class ChatLiteLLM(EngineLM, CachedEngine):
             messages=messages,
             **params
         )
-        
-        response_text = response.choices[0].message.content
-        
+
+        response_text = response.choices[0].message.content or ""
+
         if self.use_cache:
             self._save_cache(cache_key, response_text)
-        
+
         return response_text
-    
+
     def _generate_multimodal(
         self, content_list, system_prompt=None, temperature=0, max_tokens=4000, top_p=0.99, **kwargs
     ):

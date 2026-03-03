@@ -157,34 +157,55 @@ Be biref and precise with insight.
             return f"No matched tool given: {tool_name}"
 
         try:
+            # Handle non-string responses (error dicts, None)
+            if response is None or isinstance(response, dict):
+                print(f"Planner returned non-string response: {type(response).__name__}")
+                return None, None, None
+
             if isinstance(response, str):
                 # Debug: print full response
                 print(f"DEBUG planner response:\n{response}")
+                if not response.strip():
+                    print("Planner returned empty response")
+                    return None, None, None
                 # Attempt to parse the response as JSON
                 try:
                     response_dict = json.loads(response)
                     response = NextStep(**response_dict)
                 except Exception as e:
-                    print(f"Failed to parse response as JSON: {str(e)}")
+                    pass  # Not JSON, will try regex below
+
             if isinstance(response, NextStep):
-                print("arielg 1")
                 context = response.context.strip()
                 sub_goal = response.sub_goal.strip()
                 tool_name = response.tool_name.strip()
             else:
-                print("arielg 2")
-                text = response.replace("**", "")
+                text = str(response)
+                # Strip bold markers and backticks
+                text = text.replace("**", "").replace("```", "")
 
-                # Pattern to match the exact format
-                pattern = r"Context:\s*(.*?)Sub-Goal:\s*(.*?)Tool Name:\s*(.*?)\s*(?:```)?\s*(?=\n\n|\Z)"
-
-                # Find all matches
+                # Try the combined pattern first (all three fields in sequence)
+                pattern = r"Context:\s*(.*?)Sub[- ]?Goal:\s*(.*?)Tool(?:\s*Name)?:\s*(.*?)\s*(?=\n\n|\Z)"
                 matches = re.findall(pattern, text, re.DOTALL)
 
-                # Return the last match (most recent/relevant)
-                context, sub_goal, tool_name = matches[-1]
-                context = context.strip()
-                sub_goal = sub_goal.strip()
+                if matches:
+                    context, sub_goal, tool_name = matches[-1]
+                    context = context.strip()
+                    sub_goal = sub_goal.strip()
+                else:
+                    # Fallback: extract each field individually
+                    context_m = re.search(r"Context:\s*(.+?)(?=\n\s*Sub[- ]?Goal:|\n\s*Tool|\Z)", text, re.DOTALL | re.IGNORECASE)
+                    subgoal_m = re.search(r"Sub[- ]?Goal:\s*(.+?)(?=\n\s*Tool|\Z)", text, re.DOTALL | re.IGNORECASE)
+                    tool_m = re.search(r"Tool(?:\s*Name)?:\s*(.+?)(?=\n\n|\n\s*$|\Z)", text, re.DOTALL | re.IGNORECASE)
+
+                    context = context_m.group(1).strip() if context_m else ""
+                    sub_goal = subgoal_m.group(1).strip() if subgoal_m else ""
+                    tool_name = tool_m.group(1).strip().split("\n")[0].strip() if tool_m else ""
+
+                    if not tool_name:
+                        print(f"Could not extract tool name from response:\n{text[-300:]}")
+                        return None, None, None
+
             tool_name = normalize_tool_name(tool_name)
         except Exception as e:
             print(f"Error extracting context, sub-goal, and tool name: {str(e)}")
