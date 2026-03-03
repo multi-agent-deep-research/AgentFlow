@@ -539,24 +539,25 @@ def run_evaluation(
             if judge_obj["judge_result"].get("correct", False):
                 judge_correct += 1
 
-        judge_accuracy = judge_correct / judge_total if judge_total > 0 else 0
-
-        # Log to wandb (includes running judge accuracy)
+        # Log to wandb every step (even if judge was skipped for failed samples)
+        total_processed = completed + failed
+        judge_accuracy = judge_correct / total_processed if total_processed > 0 else 0
         wandb.log({
             "completed": completed,
             "failed": failed,
-            "total_processed": completed + failed,
-            "completion_rate": completed / (completed + failed) if (completed + failed) > 0 else 0,
+            "total_processed": total_processed,
+            "completion_rate": completed / total_processed if total_processed > 0 else 0,
             "judge_correct": judge_correct,
             "judge_total": judge_total,
             "judge_accuracy": judge_accuracy,
         })
 
-        print(f"  Running judge accuracy: {judge_correct}/{judge_total} ({judge_accuracy * 100:.1f}%)")
+        print(f"  Running judge accuracy: {judge_correct}/{total_processed} ({judge_accuracy * 100:.1f}%) | processed: {total_processed}/{len(queries)}")
 
     # Save judge results
     judge_parse_errors = sum(1 for j in judge_results if j["judge_result"].get("parse_error"))
-    judge_accuracy = judge_correct / judge_total if judge_total > 0 else 0
+    total_processed = completed + failed
+    judge_accuracy = judge_correct / total_processed if total_processed > 0 else 0
 
     judge_summary = {
         "judge_model": judge_model,
@@ -598,7 +599,8 @@ def run_evaluation(
 
     print(f"\n{'=' * 70}")
     print(f"Judge Results ({judge_model}):")
-    print(f"  Accuracy: {judge_correct}/{judge_total} ({judge_accuracy * 100:.1f}%)")
+    print(f"  Accuracy: {judge_correct}/{total_processed} ({judge_accuracy * 100:.1f}%)")
+    print(f"  Judged: {judge_total}/{total_processed} (failed/error samples count as incorrect)")
     print(f"  Parse errors: {judge_parse_errors}/{judge_total}")
     print(f"{'=' * 70}")
 
