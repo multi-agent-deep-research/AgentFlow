@@ -206,7 +206,8 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
                      verbose : bool = True,
                      vllm_config_path : str = None,
                      base_url : str = None,
-                     temperature: float = 0.0
+                     temperature: float = 0.0,
+                     max_output_tokens: int = None,
                      ):
 
     # Parse model_engine configuration
@@ -234,7 +235,8 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         available_tools=initializer.available_tools,
         verbose=verbose,
         base_url=base_url,
-        temperature=temperature
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
     )
 
     # Instantiate Verifier
@@ -245,7 +247,8 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         available_tools=initializer.available_tools,
         verbose=verbose,
         # base_url=base_url if verifier_engine == llm_engine_name else None,
-        temperature=temperature
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
     )
 
     # Instantiate Memory
@@ -258,7 +261,8 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
         verbose=verbose,
         # base_url=base_url if executor_engine == llm_engine_name else None,  # Only use base_url for trainable model
         temperature=temperature,
-        tool_instances_cache=initializer.tool_instances_cache  # Pass the cached tool instances
+        tool_instances_cache=initializer.tool_instances_cache,  # Pass the cached tool instances
+        max_output_tokens=max_output_tokens,
     )
 
     # Instantiate Solver

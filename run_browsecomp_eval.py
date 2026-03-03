@@ -2,30 +2,30 @@
 """
 Run BrowseComp-Plus evaluation with AgentFlow.
 
-Models:
-- Planner: vLLM with AgentFlow/agentflow-planner-7b (local)
-- Verifier/Executor/Generator: OpenRouter qwen/qwen-2.5-7b-instruct
+Two modes are supported:
 
-Setup:
-    # 1. Start vLLM server with the planner model
-    vllm serve AgentFlow/agentflow-planner-7b --port 8000
+1. HYBRID mode (default):
+   - Planner: local vLLM with AgentFlow/agentflow-planner-7b
+   - Verifier/Executor/Generator: OpenRouter qwen/qwen-2.5-7b-instruct
 
-    # 2. Set up environment
-    export VLLM_BASE_URL=http://localhost:8000/v1
-    export OPENROUTER_API_KEY=your_key  # From https://openrouter.ai/keys
-    export BROWSECOMP_INDEX_PATH=/path/to/BrowseComp-Plus/indexes/bm25
+   Setup:
+       vllm serve AgentFlow/agentflow-planner-7b --port 8000
+       export VLLM_BASE_URL=http://localhost:8000/v1
+       export OPENROUTER_API_KEY=your_key
+       python run_browsecomp_eval.py --num-queries 10
 
-    # 3. Run evaluation (test with 10 queries first)
-    python run_browsecomp_eval.py --num-queries 10
+2. UNIFIED mode (--unified-model):
+   - All components use a single model via LiteLLM (no local vLLM needed)
 
-    # 4. Run full evaluation (830 queries, ~12-24 hours)
-    python run_browsecomp_eval.py
+   Setup:
+       export DEEPINFRA_API_KEY=your_key   # or OPENROUTER_API_KEY, etc.
+       python run_browsecomp_eval.py --unified-model litellm-deepinfra/gpt-oss-120b --num-queries 10
 
-Available OpenRouter models:
-    - qwen/qwen-2.5-7b-instruct (free tier available)
-    - google/gemma-3-27b-it:free
-    - meta-llama/llama-3.1-70b-instruct
-    See https://openrouter.ai/models for more options
+   Supported providers (via LiteLLM):
+       - litellm-deepinfra/MODEL_NAME   (DeepInfra)
+       - litellm-openrouter/MODEL_NAME  (OpenRouter)
+       - litellm-together_ai/MODEL_NAME (Together AI)
+       - gpt-4o, gpt-4.1, etc.         (OpenAI directly)
 """
 
 import argparse
@@ -135,98 +135,47 @@ def parse_judge_response(judge_response):
     return result
 
 
-def run_judge_evaluation(results, output_path, judge_model="openai/gpt-4.1"):
-    """Run LLM-as-judge evaluation on completed results using OpenRouter."""
-    import openai
+def judge_single_result(result_obj, judge_client, judge_model="openai/gpt-4.1"):
+    """Run LLM-as-judge on a single completed result.
 
-    completed_results = [r for r in results if r.get("status") == "completed"]
-    if not completed_results:
-        print("\nNo completed results to judge.")
-        return {}
+    Returns:
+        dict with query_id, judge_response, judge_result, gold_answer — or None if skipped.
+    """
+    if result_obj.get("status") != "completed":
+        return None
 
-    print("\n" + "=" * 70)
-    print(f"LLM Judge Evaluation ({judge_model})")
-    print("=" * 70)
-    print(f"Judging {len(completed_results)} completed results...")
+    query_id = result_obj["query_id"]
+    response_text = result_obj.get("result", [{}])[-1].get("output", "")
+    gold_answer = result_obj.get("gold_answer", "")
+    query_text = result_obj.get("query_text", "") or "(see response for context)"
 
-    client = openai.OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+    judge_prompt = GRADER_TEMPLATE.format(
+        question=query_text, response=response_text, correct_answer=gold_answer
     )
 
-    judge_results = []
-    correct_count = 0
-
-    for r in tqdm(completed_results, desc="Judging"):
-        query_id = r["query_id"]
-        response_text = r.get("result", [{}])[-1].get("output", "")
-        gold_answer = r.get("gold_answer", "")
-
-        # Build the judge prompt
-        # Use the query text from the result if available, otherwise reconstruct
-        query_text = r.get("query_text", "")
-        if not query_text:
-            # The query text isn't stored separately, use what we have
-            # For loaded queries, we stored gold_answer but not query; use response context
-            query_text = "(see response for context)"
-
-        judge_prompt = GRADER_TEMPLATE.format(
-            question=query_text, response=response_text, correct_answer=gold_answer
+    try:
+        response = judge_client.chat.completions.create(
+            model=judge_model,
+            messages=[{"role": "user", "content": judge_prompt}],
+            max_tokens=1024,
         )
+        judge_text = response.choices[0].message.content or ""
+    except Exception as e:
+        print(f"  [{query_id}] Judge error: {e}")
+        judge_text = ""
 
-        try:
-            response = client.chat.completions.create(
-                model=judge_model,
-                messages=[{"role": "user", "content": judge_prompt}],
-                max_tokens=1024,
-            )
-            judge_text = response.choices[0].message.content or ""
-        except Exception as e:
-            print(f"  [{query_id}] Judge error: {e}")
-            judge_text = ""
+    parsed = parse_judge_response(judge_text)
+    is_correct = parsed.get("correct", False)
 
-        parsed = parse_judge_response(judge_text)
-        is_correct = parsed.get("correct", False)
-        if is_correct:
-            correct_count += 1
+    status = "CORRECT" if is_correct else ("INCORRECT" if parsed["correct"] is not None else "PARSE_ERROR")
+    print(f"  Judge [{query_id}] {status} | extracted: {parsed.get('extracted_final_answer', 'N/A')[:80]} | gold: {gold_answer[:80]}")
 
-        judge_obj = {
-            "query_id": query_id,
-            "judge_response": judge_text,
-            "judge_result": parsed,
-            "gold_answer": gold_answer,
-        }
-        judge_results.append(judge_obj)
-
-        status = "CORRECT" if is_correct else ("INCORRECT" if parsed["correct"] is not None else "PARSE_ERROR")
-        print(f"  [{query_id}] {status} | extracted: {parsed.get('extracted_final_answer', 'N/A')[:80]} | gold: {gold_answer[:80]}")
-
-    # Summary
-    total = len(completed_results)
-    accuracy = correct_count / total if total > 0 else 0
-    parse_errors = sum(1 for j in judge_results if j["judge_result"].get("parse_error"))
-
-    print(f"\n{'=' * 70}")
-    print(f"Judge Results ({judge_model}):")
-    print(f"  Accuracy: {correct_count}/{total} ({accuracy * 100:.1f}%)")
-    print(f"  Parse errors: {parse_errors}/{total}")
-    print(f"{'=' * 70}")
-
-    # Save judge results
-    judge_summary = {
-        "judge_model": judge_model,
-        "total_judged": total,
-        "correct": correct_count,
-        "accuracy": accuracy,
-        "parse_errors": parse_errors,
-        "per_query": judge_results,
+    return {
+        "query_id": query_id,
+        "judge_response": judge_text,
+        "judge_result": parsed,
+        "gold_answer": gold_answer,
     }
-    judge_path = output_path / "judge_results.json"
-    with open(judge_path, "w") as f:
-        json.dump(judge_summary, f, indent=2)
-    print(f"Judge results saved to: {judge_path}")
-
-    return judge_summary
 
 
 def extract_tool_call_counts(memory):
@@ -319,6 +268,7 @@ def run_evaluation(
     judge_model="openai/gpt-4.1",
     random_sample=False,
     seed=42,
+    unified_model=None,
 ):
     """
     Run evaluation on BrowseComp-Plus.
@@ -327,8 +277,9 @@ def run_evaluation(
         output_dir: Base directory for eval logs
         num_queries: Number of queries to evaluate (None = all)
         max_steps: Maximum steps per query
-        planner_model: Model for planner (vLLM local)
-        openrouter_model: Model for verifier/executor (OpenRouter)
+        planner_model: Model for planner (vLLM local) — ignored when unified_model is set
+        openrouter_model: Model for verifier/executor (OpenRouter) — ignored when unified_model is set
+        unified_model: If set, use this single model for ALL components (e.g. "litellm-deepinfra/gpt-oss-120b")
     """
     # Create timestamped output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -356,43 +307,63 @@ def run_evaluation(
     sys.stdout = tee
     sys.stderr = tee
 
+    # Determine mode: unified (single model) vs hybrid (vLLM planner + OpenRouter)
+    is_unified = unified_model is not None
+    if is_unified:
+        planner_model = unified_model
+        openrouter_model = unified_model
+
     # Initialize wandb with custom server
     os.environ["WANDB_BASE_URL"] = "https://wandb-radfan.ru"
     os.environ["WANDB_API_KEY"] = os.environ.get("WANDB_API_KEY", "local-6bd76c2bceb4dc4b88016f4581c0327305ea08c2")
 
+    wandb_config = {
+        "mode": "unified" if is_unified else "hybrid",
+        "planner_model": planner_model,
+        "openrouter_model": openrouter_model,
+        "judge_model": judge_model,
+        "max_steps": max_steps,
+        "num_queries": num_queries or 830,
+        "output_dir": str(output_path),
+        "timestamp": timestamp,
+    }
+    if is_unified:
+        wandb_config["unified_model"] = unified_model
+
     wandb.init(
         entity="multiagent-deepresearch-improvement",
         project="AgentFlow-Pro-Eval-BrowseComp-Plus",
-        config={
-            "planner_model": planner_model,
-            "openrouter_model": openrouter_model,
-            "judge_model": judge_model,
-            "max_steps": max_steps,
-            "num_queries": num_queries or 830,
-            "output_dir": str(output_path),
-            "timestamp": timestamp,
-        },
+        config=wandb_config,
         name=f"eval_{timestamp}_{num_queries or 'all'}q",
     )
 
-    # Set up environment for local vLLM
-    vllm_base_url = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")
+    # Set up environment based on mode
+    vllm_base_url = None
+    if is_unified:
+        # Unified mode: no local vLLM needed
+        import litellm
+    else:
+        # Hybrid mode: local vLLM for planner + OpenRouter for other components
+        vllm_base_url = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")
 
-    # Set up OpenRouter API key
-    if "OPENROUTER_API_KEY" not in os.environ:
-        print("Warning: OPENROUTER_API_KEY not set. Set it with:")
-        print("  export OPENROUTER_API_KEY=your_key")
-        print("Continuing anyway (will fail if key is required)...")
+        if "OPENROUTER_API_KEY" not in os.environ:
+            print("Warning: OPENROUTER_API_KEY not set. Set it with:")
+            print("  export OPENROUTER_API_KEY=your_key")
+            print("Continuing anyway (will fail if key is required)...")
 
-    # Configure LiteLLM for OpenRouter
-    import litellm
-    litellm.api_base = "https://openrouter.ai/api/v1"
+        # Configure LiteLLM for OpenRouter
+        import litellm
+        litellm.api_base = "https://openrouter.ai/api/v1"
 
     print("=" * 70)
     print("BrowseComp-Plus Evaluation with AgentFlow")
+    print(f"Mode: {'UNIFIED' if is_unified else 'HYBRID'}")
     print("=" * 70)
-    print(f"Planner: {planner_model} @ {vllm_base_url}")
-    print(f"Verifier/Executor: {openrouter_model}")
+    if is_unified:
+        print(f"Model (all components): {unified_model}")
+    else:
+        print(f"Planner: {planner_model} @ {vllm_base_url}")
+        print(f"Verifier/Executor: {openrouter_model}")
     print(f"Judge: {judge_model}")
     print(f"Output dir: {output_path}")
     print(f"Max queries: {num_queries or 'all (830)'}")
@@ -407,25 +378,25 @@ def run_evaluation(
     # Construct solver
     # model_engine: [planner_main, planner_fixed, verifier, executor]
     model_engine = [
-        planner_model,      # planner_main - local vLLM
-        planner_model,      # planner_fixed - local vLLM
-        openrouter_model,   # verifier - OpenRouter
-        openrouter_model,   # executor - OpenRouter
+        planner_model,      # planner_main
+        planner_model,      # planner_fixed
+        openrouter_model,   # verifier
+        openrouter_model,   # executor
     ]
 
     # Tools: Web_Search_Tool (browsecomp_search) + Base_Generator_Tool
     # BrowseComp_Search_Tool is the class name -> maps to browsecomp_search dir
     # The tool reports itself as Web_Search_Tool to match planner's training
     enabled_tools = ["Base_Generator_Tool", "BrowseComp_Search_Tool"]
-    tool_engine = [openrouter_model, "Default"]  # Generator uses OpenRouter, BrowseComp uses Default
+    tool_engine = [openrouter_model, "Default"]  # Generator uses model, BrowseComp uses Default
 
     print(f"\nInitializing solver...")
     print(f"  model_engine: {model_engine}")
     print(f"  enabled_tools: {enabled_tools}")
     print(f"  tool_engine: {tool_engine}")
 
-    solver = construct_solver(
-        llm_engine_name=planner_model,  # Main LLM engine name
+    solver_kwargs = dict(
+        llm_engine_name=planner_model,
         model_engine=model_engine,
         enabled_tools=enabled_tools,
         tool_engine=tool_engine,
@@ -433,14 +404,41 @@ def run_evaluation(
         max_time=300,  # 5 minutes per query
         max_tokens=4000,
         verbose=True,
-        base_url=vllm_base_url,  # For local vLLM
         temperature=0.0,
     )
+    # Only pass base_url when using local vLLM (hybrid mode)
+    if vllm_base_url:
+        solver_kwargs["base_url"] = vllm_base_url
+    # In unified mode, cap output tokens per LLM call to stay within context window
+    if is_unified:
+        solver_kwargs["max_output_tokens"] = 4096
+
+    solver = construct_solver(**solver_kwargs)
+
+    # Initialize judge client
+    import openai as _openai
+    if is_unified:
+        # Unified mode: use DeepInfra for judge
+        if not judge_model or judge_model == "openai/gpt-4.1":
+            judge_model = "deepseek-ai/DeepSeek-V3"
+        judge_client = _openai.OpenAI(
+            base_url="https://api.deepinfra.com/v1/openai",
+            api_key=os.environ.get("DEEPINFRA_API_KEY", ""),
+        )
+        print(f"Judge: {judge_model} via DeepInfra")
+    else:
+        judge_client = _openai.OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+        )
 
     # Run evaluation
     results = []
+    judge_results = []
     completed = 0
     failed = 0
+    judge_correct = 0
+    judge_total = 0
 
     print(f"\nRunning evaluation...")
 
@@ -533,13 +531,45 @@ def run_evaluation(
         else:
             failed += 1
 
-        # Log to wandb
+        # Run judge on this sample immediately
+        judge_obj = judge_single_result(result_obj, judge_client, judge_model=judge_model)
+        if judge_obj is not None:
+            judge_results.append(judge_obj)
+            judge_total += 1
+            if judge_obj["judge_result"].get("correct", False):
+                judge_correct += 1
+
+        judge_accuracy = judge_correct / judge_total if judge_total > 0 else 0
+
+        # Log to wandb (includes running judge accuracy)
         wandb.log({
             "completed": completed,
             "failed": failed,
             "total_processed": completed + failed,
             "completion_rate": completed / (completed + failed) if (completed + failed) > 0 else 0,
+            "judge_correct": judge_correct,
+            "judge_total": judge_total,
+            "judge_accuracy": judge_accuracy,
         })
+
+        print(f"  Running judge accuracy: {judge_correct}/{judge_total} ({judge_accuracy * 100:.1f}%)")
+
+    # Save judge results
+    judge_parse_errors = sum(1 for j in judge_results if j["judge_result"].get("parse_error"))
+    judge_accuracy = judge_correct / judge_total if judge_total > 0 else 0
+
+    judge_summary = {
+        "judge_model": judge_model,
+        "total_judged": judge_total,
+        "correct": judge_correct,
+        "accuracy": judge_accuracy,
+        "parse_errors": judge_parse_errors,
+        "per_query": judge_results,
+    }
+    judge_path = output_path / "judge_results.json"
+    with open(judge_path, "w") as f:
+        json.dump(judge_summary, f, indent=2)
+    print(f"\nJudge results saved to: {judge_path}")
 
     # Save summary
     summary = {
@@ -549,6 +579,10 @@ def run_evaluation(
         "completion_rate": completed / len(queries) if queries else 0,
         "planner_model": planner_model,
         "openrouter_model": openrouter_model,
+        "judge_model": judge_model,
+        "judge_accuracy": judge_accuracy,
+        "judge_correct": judge_correct,
+        "judge_total": judge_total,
         "output_dir": str(output_path),
         "timestamp": timestamp,
     }
@@ -561,21 +595,12 @@ def run_evaluation(
     print("=" * 70)
     print(json.dumps(summary, indent=2))
     print(f"\nResults saved to: {output_path}")
-    print(f"\nTo evaluate with BrowseComp-Plus LLM judge:")
-    print(f"  python BrowseComp-Plus/scripts_evaluation/evaluate_run.py --input_dir {output_path}")
-    print(f"\nLeaderboard: https://huggingface.co/spaces/Tevatron/BrowseComp-Plus")
 
-    # Run LLM judge evaluation
-    judge_summary = run_judge_evaluation(results, output_path, judge_model=judge_model)
-
-    # Add judge metrics to summary
-    if judge_summary:
-        summary["judge_model"] = judge_summary.get("judge_model", "")
-        summary["judge_accuracy"] = judge_summary.get("accuracy", 0)
-        summary["judge_correct"] = judge_summary.get("correct", 0)
-        # Re-save summary with judge results
-        with open(output_path / "summary.json", "w") as f:
-            json.dump(summary, f, indent=2)
+    print(f"\n{'=' * 70}")
+    print(f"Judge Results ({judge_model}):")
+    print(f"  Accuracy: {judge_correct}/{judge_total} ({judge_accuracy * 100:.1f}%)")
+    print(f"  Parse errors: {judge_parse_errors}/{judge_total}")
+    print(f"{'=' * 70}")
 
     # Log final summary to wandb
     wandb.log({
@@ -583,8 +608,8 @@ def run_evaluation(
         "final/completed": summary["completed"],
         "final/failed": summary["failed"],
         "final/completion_rate": summary["completion_rate"],
-        "final/judge_accuracy": summary.get("judge_accuracy", 0),
-        "final/judge_correct": summary.get("judge_correct", 0),
+        "final/judge_accuracy": judge_accuracy,
+        "final/judge_correct": judge_correct,
     })
 
     # Upload all result files to wandb
@@ -649,6 +674,15 @@ def main():
         help="Model for LLM judge evaluation (OpenRouter, default: openai/gpt-4.1)"
     )
     parser.add_argument(
+        "--unified-model",
+        default=None,
+        help=(
+            "Use a single model for ALL components (planner, verifier, executor, generator). "
+            "Overrides --planner-model and --openrouter-model. "
+            "Example: --unified-model litellm-deepinfra/gpt-oss-120b"
+        ),
+    )
+    parser.add_argument(
         "--random",
         action="store_true",
         default=False,
@@ -663,13 +697,16 @@ def main():
 
     args = parser.parse_args()
 
-    # Check environment
-    if not os.environ.get("VLLM_BASE_URL"):
-        print("Warning: VLLM_BASE_URL not set, using default http://localhost:8000/v1")
+    # Check environment based on mode
+    if args.unified_model:
+        print(f"Unified mode: using {args.unified_model} for all components")
+    else:
+        if not os.environ.get("VLLM_BASE_URL"):
+            print("Warning: VLLM_BASE_URL not set, using default http://localhost:8000/v1")
 
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        print("Warning: OPENROUTER_API_KEY not set")
-        print("Set it with: export OPENROUTER_API_KEY=your_key")
+        if not os.environ.get("OPENROUTER_API_KEY"):
+            print("Warning: OPENROUTER_API_KEY not set")
+            print("Set it with: export OPENROUTER_API_KEY=your_key")
 
     run_evaluation(
         output_dir=args.output_dir,
@@ -680,6 +717,7 @@ def main():
         judge_model=args.judge_model,
         random_sample=args.random,
         seed=args.seed,
+        unified_model=args.unified_model,
     )
 
 
