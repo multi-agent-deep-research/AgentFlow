@@ -322,20 +322,29 @@ class ChatLiteLLM(EngineLM, CachedEngine):
         params.update(self.kwargs)
         params.update(kwargs)
         
-        # Make the API call
-        response = litellm.completion(
-            model=self.model_string,
-            messages=messages,
-            **params
-        )
-        
-        response_text = response.choices[0].message.content
-        
-        if self.use_cache:
+        # Make the API call with retry on empty responses
+        max_retries = 3
+        for attempt in range(max_retries):
+            response = litellm.completion(
+                model=self.model_string,
+                messages=messages,
+                **params
+            )
+
+            response_text = response.choices[0].message.content or ""
+            if response_text.strip():
+                break
+
+            finish_reason = getattr(response.choices[0], 'finish_reason', 'unknown')
+            print(f"Empty response from model (attempt {attempt + 1}/{max_retries}, finish_reason={finish_reason}), retrying...")
+            import time
+            time.sleep(2)
+
+        if self.use_cache and response_text.strip():
             self._save_cache(cache_key, response_text)
-        
+
         return response_text
-    
+
     def _generate_multimodal(
         self, content_list, system_prompt=None, temperature=0, max_tokens=4000, top_p=0.99, **kwargs
     ):
