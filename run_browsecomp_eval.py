@@ -397,7 +397,7 @@ def run_evaluation(
     # BrowseComp_Search_Tool is the class name -> maps to browsecomp_search dir
     # The tool reports itself as Web_Search_Tool to match planner's training
     enabled_tools = ["Base_Generator_Tool", "BrowseComp_Search_Tool"]
-    tool_engine = [api_model, "Default"]  # Generator uses model, BrowseComp uses Default
+    tool_engine = [api_model, api_model]  # Generator uses model, BrowseComp uses model for summarization
 
     print(f"\nInitializing solver...")
     print(f"  model_engine: {model_engine}")

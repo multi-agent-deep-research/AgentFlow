@@ -26,6 +26,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from agentflow.tools.base import BaseTool
+from agentflow.engine.factory import create_llm_engine
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -33,18 +34,39 @@ logger = logging.getLogger(__name__)
 TOOL_NAME = "Web_Search_Tool"
 
 LIMITATIONS = """
-1. This tool searches a fixed corpus of ~100K documents (not the live web).
-2. The corpus is static and may not contain the most recent information.
-3. Results are limited to the pre-indexed documents.
-4. The tool requires a pre-built index (BM25 or FAISS) to be available.
+1. This tool searches a fixed corpus of ~100K curated web documents (not the live web).
+2. BM25 retrieval is keyword-based — it may miss relevant documents if query terms don't overlap with document text.
+3. A single query often returns only partially relevant results; multiple diverse queries are usually needed.
+4. Snippets are truncated — important details may be cut off. Look for key facts in the visible portion.
+5. The corpus may not contain a document that directly states the answer; you may need to piece together information from multiple results.
 """
 
 BEST_PRACTICES = """
-1. Use specific, targeted queries for better results.
-2. The tool works best for factual questions about topics covered in the corpus.
-3. For multi-step reasoning, break down complex questions into simpler queries.
-4. Use the get_document function to retrieve full document content when needed.
+1. Reformulate the query in multiple ways: use synonyms, related terms, and different phrasings to maximize recall.
+2. Extract specific entities, names, dates, or numbers from the question and use them as search keywords.
+3. If the first search returns poor results, try a completely different angle — search for related entities or context clues.
+4. For questions about specific facts (e.g., "who founded X"), search for the entity name directly rather than the full question.
+5. Combine evidence from multiple search results to build your answer — rarely will a single result contain the complete answer.
+6. Pay attention to document IDs and scores — higher-scored documents are more likely relevant.
+7. Avoid overly broad queries (e.g., "history of science") — be as specific as possible to the question's requirements.
+8. If you need a specific number, date, or name, include surrounding context in your query to help locate the right document.
 """
+
+SUMMARIZE_RESULTS_PROMPT = """You are a research assistant. Given a search query and retrieved document snippets, extract and summarize the most relevant information.
+
+Query: {query}
+
+Retrieved Documents:
+{documents}
+
+Instructions:
+- Focus only on information directly relevant to answering the query
+- Preserve specific facts: names, dates, numbers, locations
+- Cite document IDs [DocID: X] when referencing information
+- If no documents are relevant, say so clearly
+- Be concise but preserve all important details
+
+Summary:"""
 
 # Try to import BrowseComp-Plus searcher
 try:
@@ -98,7 +120,6 @@ class BrowseComp_Search_Tool(BaseTool):
     Attributes:
         index_type: Type of index ("bm25" or "faiss")
         index_path: Path to the pre-built index
-        max_chars_per_result: Maximum characters per result snippet (None = full text)
         k: Number of results to return
         include_get_document: Whether to include get_document functionality
 
@@ -107,8 +128,11 @@ class BrowseComp_Search_Tool(BaseTool):
         BROWSECOMP_INDEX_TYPE: Default index type ("bm25" or "faiss")
     """
 
+    require_llm_engine = True
+
     def __init__(
         self,
+        model_string: str = "gpt-4o-mini",
         index_type: Optional[str] = None,
         index_path: Optional[str] = None,
         max_chars_per_result: Optional[int] = 512,
@@ -119,9 +143,10 @@ class BrowseComp_Search_Tool(BaseTool):
         Initialize the BrowseComp-Plus search tool.
 
         Args:
+            model_string: Model string for LLM summarization engine
             index_type: Type of index ("bm25" or "faiss")
             index_path: Path to the pre-built index directory
-            max_chars_per_result: Maximum characters per result snippet (None for full text)
+            max_chars_per_result: Maximum characters per result snippet (fallback only)
             k: Number of search results to return
             include_get_document: Whether to support get_document functionality
         """
@@ -179,9 +204,21 @@ class BrowseComp_Search_Tool(BaseTool):
         self.max_chars_per_result = max_chars_per_result
         self.k = k
         self.include_get_document = include_get_document
+        self.model_string = model_string
 
         # Initialize searcher
         self.searcher = self._create_searcher()
+
+        # Initialize LLM engine for summarization
+        print(f"Initializing BrowseComp Search Tool with summarization model: {self.model_string}")
+        self.llm_engine = create_llm_engine(
+            model_string=self.model_string,
+            is_multimodal=False,
+            temperature=0.0,
+            top_p=1.0,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+        )
         logger.info(f"Initialized BrowseComp-Plus tool with {index_type} searcher at {index_path}")
 
     def _create_searcher(self) -> "BaseSearcher":
@@ -212,16 +249,35 @@ class BrowseComp_Search_Tool(BaseTool):
         else:
             raise ValueError(f"Unknown index type: {self.index_type}. Use 'bm25' or 'faiss'.")
 
+    def _format_results_raw(self, results: List[Dict], truncate: bool = True) -> str:
+        """Format raw search results, optionally truncating snippets."""
+        lines = []
+        for idx, result in enumerate(results, start=1):
+            docid = result.get("docid", "")
+            score = result.get("score", 0)
+            snippet = result.get("snippet", result.get("text", ""))
+
+            if truncate and self.max_chars_per_result and snippet and len(snippet) > self.max_chars_per_result:
+                snippet = snippet[:self.max_chars_per_result] + "..."
+
+            line = f"{idx}. [DocID: {docid}] (Score: {score:.2f})\n   {snippet}"
+            lines.append(line)
+
+        return "\n\n".join(lines)
+
     def execute(self, query: str, k: Optional[int] = None) -> str:
         """
         Execute search query against BrowseComp-Plus corpus.
+
+        Retrieves k results and uses an LLM to summarize them into a focused
+        summary preserving key facts (names, dates, numbers, DocIDs).
 
         Args:
             query: The search query
             k: Number of results to return (overrides default)
 
         Returns:
-            Formatted search results as a string
+            LLM-summarized search results, or truncated raw results on failure
         """
         k = k or self.k
 
@@ -236,21 +292,31 @@ class BrowseComp_Search_Tool(BaseTool):
         if not results:
             return "No results found."
 
-        # Format results
-        lines = []
+        # Format full-text results for LLM summarization
+        doc_texts = []
         for idx, result in enumerate(results, start=1):
             docid = result.get("docid", "")
             score = result.get("score", 0)
             snippet = result.get("snippet", result.get("text", ""))
+            doc_texts.append(f"[DocID: {docid}] (Score: {score:.2f})\n{snippet}")
+        documents_block = "\n\n---\n\n".join(doc_texts)
 
-            # Truncate snippet if needed
-            if self.max_chars_per_result and snippet and len(snippet) > self.max_chars_per_result:
-                snippet = snippet[:self.max_chars_per_result] + "..."
-
-            line = f"{idx}. [DocID: {docid}] (Score: {score:.2f})\n   {snippet}"
-            lines.append(line)
-
-        return "\n\n".join(lines)
+        # Summarize with LLM
+        try:
+            prompt = SUMMARIZE_RESULTS_PROMPT.format(query=query, documents=documents_block)
+            print(f"[BrowseComp] Summarizing {len(results)} results with LLM ({self.model_string})...")
+            summary = self.llm_engine(prompt)
+            if summary and summary.strip():
+                print(f"[BrowseComp] Summarization successful ({len(summary.strip())} chars)")
+                return summary.strip()
+            else:
+                print("[BrowseComp] Summarization returned empty, falling back to truncated results")
+                logger.warning("LLM summarization returned empty result, falling back to raw results")
+                return self._format_results_raw(results, truncate=True)
+        except Exception as e:
+            print(f"[BrowseComp] Summarization failed: {e}, falling back to truncated results")
+            logger.warning(f"LLM summarization failed: {e}, falling back to raw results")
+            return self._format_results_raw(results, truncate=True)
 
     def get_document(self, docid: str) -> Optional[Dict[str, Any]]:
         """
