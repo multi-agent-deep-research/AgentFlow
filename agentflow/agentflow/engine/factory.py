@@ -56,6 +56,13 @@ def create_llm_engine(model_string: str, use_cache: bool = False, is_multimodal:
         }
         if "max_output_tokens" in kwargs:
             config["max_tokens"] = kwargs["max_output_tokens"]
+        if "extra_body" in kwargs:
+            config["extra_body"] = kwargs["extra_body"]
+        # Auto-disable thinking mode for Qwen3 models to prevent <think> tags in output
+        if "qwen3" in model_string.lower() or "qwen/qwen3" in model_string.lower():
+            existing = config.get("extra_body", {})
+            existing.setdefault("chat_template_kwargs", {}).setdefault("enable_thinking", False)
+            config["extra_body"] = existing
         return ChatLiteLLM(**config)
 
     # === Azure OpenAI ===

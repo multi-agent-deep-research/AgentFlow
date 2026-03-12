@@ -231,6 +231,91 @@ Each query contains:
 }
 ```
 
+## Running Evaluation
+
+### Prerequisites
+
+- **2 GPUs recommended**: one for vLLM planner, one for the FAISS embedding model
+- **API key**: `DEEPINFRA_API_KEY` or `OPENROUTER_API_KEY` for the executor/verifier model
+- **Environment variables**:
+  ```bash
+  export BROWSECOMP_INDEX_PATH=/path/to/BrowseComp-Plus/indexes/faiss/qwen3-embed-8b
+  export BROWSECOMP_INDEX_TYPE=faiss
+  export DEEPINFRA_API_KEY=your_key
+  ```
+
+### Mode 1: Hybrid (Local Planner + API Model)
+
+This is the recommended mode. The fine-tuned planner runs locally via vLLM, while the executor, verifier, generator, and search summarizer use an API model.
+
+**Step 1: Start the vLLM planner server** (on GPU 1):
+```bash
+CUDA_VISIBLE_DEVICES=1 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.9
+```
+
+Wait until you see `Application startup complete`, or check with:
+```bash
+curl -s http://localhost:8000/v1/models
+```
+
+**Step 2: Run the evaluation** (FAISS searcher on GPU 0):
+```bash
+CUDA_VISIBLE_DEVICES=0 python run_browsecomp_eval.py \
+    --service deepinfra \
+    --model Qwen/Qwen3-14B \
+    --num-queries 50 \
+    --max-steps 20
+```
+
+### Mode 2: Unified (Single API Model for Everything)
+
+No local GPU needed for the planner — all components use the same API model.
+
+```bash
+python run_browsecomp_eval.py \
+    --unified \
+    --service deepinfra \
+    --model zai-org/GLM-4.7-Flash \
+    --num-queries 50 \
+    --max-steps 5
+```
+
+### GPU Assignment
+
+When running in hybrid mode, the vLLM planner and FAISS embedding model need separate GPUs:
+
+| Component | GPU | How to set |
+|-----------|-----|------------|
+| vLLM planner | GPU 1 | `CUDA_VISIBLE_DEVICES=1 vllm serve ...` |
+| FAISS searcher (embedding model) | GPU 0 | `CUDA_VISIBLE_DEVICES=0 python run_browsecomp_eval.py ...` |
+| Executor/Verifier/Generator | API | Via `--service` and `--model` flags |
+
+### Key Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--service` | API provider (`deepinfra` or `openrouter`) | `openrouter` |
+| `--model` | Model name on the service | `qwen/qwen-2.5-7b-instruct` |
+| `--unified` | Use API model for all components (no vLLM) | `False` |
+| `--num-queries` | Number of queries to evaluate | all (830) |
+| `--max-steps` | Maximum reasoning steps per query | 3 |
+| `--random` | Randomly sample queries instead of first N | `False` |
+| `--judge-model` | Model for LLM-as-judge evaluation | `openai/gpt-4.1` |
+
+### Search Result Summarization
+
+The BrowseComp search tool uses LLM summarization to compress retrieved documents into focused summaries (instead of truncating at 512 characters). This preserves key facts like names, dates, numbers, and DocIDs. The summarization model is the same as `--model`. If summarization fails (e.g., context too long), it falls back to truncated snippets.
+
+### Output
+
+Results are saved to `runs/agentflow/<timestamp>/`:
+- `eval.log` — full execution log
+- `<query_id>.json` — per-query results
+- `judge_results.json` — LLM judge scores
+- `summary.json` — aggregate metrics
+
+Runs are also logged to W&B (`AgentFlow-Pro-Eval-BrowseComp-Plus` project).
+
 ## Evaluation Format
 
 To evaluate AgentFlow on BrowseComp-Plus, format results as:

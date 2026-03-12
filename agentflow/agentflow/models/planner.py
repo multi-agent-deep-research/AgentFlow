@@ -150,9 +150,26 @@ Be biref and precise with insight.
 
             normalized_input = to_canonical(tool_name)
 
+            # Exact canonical match
             for tool in self.available_tools:
                 if to_canonical(tool) == normalized_input:
                     return tool
+
+            # Fuzzy fallback: check if any available tool's keywords appear in the input
+            # e.g. "Web Search & Research Capabilities" should match "Web_Search_Tool"
+            input_lower = tool_name.lower()
+            best_tool = None
+            best_score = 0
+            for tool in self.available_tools:
+                # Extract meaningful words from tool name (drop "tool" suffix)
+                tool_words = [w for w in re.split('[ _]+', tool.lower()) if w not in ('tool',)]
+                matches = sum(1 for w in tool_words if w in input_lower)
+                if matches > best_score:
+                    best_score = matches
+                    best_tool = tool
+            if best_tool and best_score > 0:
+                print(f"Fuzzy tool match: '{tool_name}' -> '{best_tool}' (matched {best_score} keywords)")
+                return best_tool
 
             return f"No matched tool given: {tool_name}"
 

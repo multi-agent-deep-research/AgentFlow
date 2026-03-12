@@ -293,12 +293,23 @@ class BrowseComp_Search_Tool(BaseTool):
             return "No results found."
 
         # Format full-text results for LLM summarization
+        # Cap per-snippet and total size to stay within model context limits
+        max_chars_per_snippet = 50_000  # ~12.5K tokens per snippet
+        max_total_chars = 200_000      # ~50K tokens total for all docs
         doc_texts = []
+        total_chars = 0
         for idx, result in enumerate(results, start=1):
             docid = result.get("docid", "")
             score = result.get("score", 0)
             snippet = result.get("snippet", result.get("text", ""))
-            doc_texts.append(f"[DocID: {docid}] (Score: {score:.2f})\n{snippet}")
+            if snippet and len(snippet) > max_chars_per_snippet:
+                snippet = snippet[:max_chars_per_snippet] + "... [truncated]"
+            doc_text = f"[DocID: {docid}] (Score: {score:.2f})\n{snippet}"
+            if total_chars + len(doc_text) > max_total_chars:
+                print(f"[BrowseComp] Truncating at {idx-1}/{len(results)} docs ({total_chars} chars) to stay within context limit")
+                break
+            doc_texts.append(doc_text)
+            total_chars += len(doc_text)
         documents_block = "\n\n---\n\n".join(doc_texts)
 
         # Summarize with LLM
