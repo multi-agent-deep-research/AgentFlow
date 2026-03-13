@@ -260,7 +260,7 @@ We provide a comprehensive logging to monitor training. See [logs.md](assets/doc
 
 
 
-## 🎯 AgentFlow Benchmark 
+## 🎯 AgentFlow Benchmark
 Serve the trained planner model with VLLM (here we deploy our [7B Flow-GRPO planner model](https://huggingface.co/AgentFlow/agentflow-planner-7b)):
 ```bash
 bash scripts/serve_vllm.sh
@@ -278,7 +278,13 @@ After running, each task folder (e.g., `test/bamboogle/`) will contain:
 - `logs/`: Contains detailed execution logs for each problem index (organized by model label).
 - `results/`: Contains the model's generated answers (`output_i.json`) and final evaluation scores (`finalscore_*.log`).
 
-You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md). 
+You can find more benchmarking details in [benchmark.md](assets/doc/benchmark.md).
+
+## 🔬 BrowseComp-Plus Evaluation
+
+[BrowseComp-Plus](https://github.com/texttron/BrowseComp-Plus) is a benchmark for evaluating Deep Research agents with a fixed corpus of ~100K curated documents.
+
+See **[docs/browsecomp-integration.md](docs/browsecomp-integration.md)** for full setup, installation, and evaluation instructions.
 
 ## 🧩 Use Your Own Model in AgentFlow
 

@@ -14,13 +14,16 @@ class Planner:
     def __init__(self, llm_engine_name: str, llm_engine_fixed_name: str = "gpt-4o",
                  toolbox_metadata: dict = None, available_tools: List = None,
                  verbose: bool = False, base_url: str = None, is_multimodal: bool = False,
-                 check_model: bool = True, temperature : float = .0):
+                 check_model: bool = True, temperature : float = .0, max_output_tokens: int = None):
         self.llm_engine_name = llm_engine_name
         self.llm_engine_fixed_name = llm_engine_fixed_name
         self.is_multimodal = is_multimodal
-        # self.llm_engine_mm = create_llm_engine(model_string=llm_engine_name, is_multimodal=False, base_url=base_url, temperature = temperature)
-        self.llm_engine_fixed = create_llm_engine(model_string=llm_engine_fixed_name, is_multimodal=False, temperature = temperature)
-        self.llm_engine = create_llm_engine(model_string=llm_engine_name, is_multimodal=False, base_url=base_url, temperature = temperature)
+        engine_kwargs = dict(is_multimodal=False, temperature=temperature)
+        if max_output_tokens:
+            engine_kwargs["max_output_tokens"] = max_output_tokens
+        # self.llm_engine_mm = create_llm_engine(model_string=llm_engine_name, base_url=base_url, **engine_kwargs)
+        self.llm_engine_fixed = create_llm_engine(model_string=llm_engine_fixed_name, **engine_kwargs)
+        self.llm_engine = create_llm_engine(model_string=llm_engine_name, base_url=base_url, **engine_kwargs)
         self.toolbox_metadata = toolbox_metadata if toolbox_metadata is not None else {}
         self.available_tools = available_tools if available_tools is not None else []
 
@@ -133,7 +136,12 @@ Be biref and precise with insight.
             """
             Normalizes a tool name robustly using regular expressions.
             It handles any combination of spaces and underscores as separators.
+            Also strips backticks, quotes, and other common wrapper characters.
             """
+            # Strip markdown formatting, backticks, quotes, bullets, and whitespace
+            tool_name = tool_name.strip().strip('`').strip('"').strip("'").strip()
+            tool_name = re.sub(r'^[\s*\-•#>`]+', '', tool_name).strip().strip('`').strip()
+
             def to_canonical(name: str) -> str:
                 # Split the name by any sequence of one or more spaces or underscores
                 parts = re.split('[ _]+', name)
@@ -141,40 +149,80 @@ Be biref and precise with insight.
                 return "_".join(part.lower() for part in parts)
 
             normalized_input = to_canonical(tool_name)
-            
+
+            # Exact canonical match
             for tool in self.available_tools:
                 if to_canonical(tool) == normalized_input:
                     return tool
-                    
+
+            # Fuzzy fallback: check if any available tool's keywords appear in the input
+            # e.g. "Web Search & Research Capabilities" should match "Web_Search_Tool"
+            input_lower = tool_name.lower()
+            best_tool = None
+            best_score = 0
+            for tool in self.available_tools:
+                # Extract meaningful words from tool name (drop "tool" suffix)
+                tool_words = [w for w in re.split('[ _]+', tool.lower()) if w not in ('tool',)]
+                matches = sum(1 for w in tool_words if w in input_lower)
+                if matches > best_score:
+                    best_score = matches
+                    best_tool = tool
+            if best_tool and best_score > 0:
+                print(f"Fuzzy tool match: '{tool_name}' -> '{best_tool}' (matched {best_score} keywords)")
+                return best_tool
+
             return f"No matched tool given: {tool_name}"
 
         try:
+            # Handle non-string responses (error dicts, None)
+            if response is None or isinstance(response, dict):
+                print(f"Planner returned non-string response: {type(response).__name__}")
+                return None, None, None
+
             if isinstance(response, str):
+                # Debug: print full response
+                print(f"DEBUG planner response:\n{response}")
+                if not response.strip():
+                    print("Planner returned empty response")
+                    return None, None, None
                 # Attempt to parse the response as JSON
                 try:
                     response_dict = json.loads(response)
                     response = NextStep(**response_dict)
                 except Exception as e:
-                    print(f"Failed to parse response as JSON: {str(e)}")
+                    pass  # Not JSON, will try regex below
+
             if isinstance(response, NextStep):
-                print("arielg 1")
                 context = response.context.strip()
                 sub_goal = response.sub_goal.strip()
                 tool_name = response.tool_name.strip()
             else:
-                print("arielg 2")
-                text = response.replace("**", "")
+                text = str(response)
+                # Strip bold markers and backticks
+                text = text.replace("**", "").replace("```", "")
 
-                # Pattern to match the exact format
-                pattern = r"Context:\s*(.*?)Sub-Goal:\s*(.*?)Tool Name:\s*(.*?)\s*(?:```)?\s*(?=\n\n|\Z)"
-
-                # Find all matches
+                # Try the combined pattern first (all three fields in sequence)
+                pattern = r"Context:\s*(.*?)Sub[- ]?Goal:\s*(.*?)Tool(?:\s*Name)?:\s*(.*?)\s*(?=\n\n|\Z)"
                 matches = re.findall(pattern, text, re.DOTALL)
 
-                # Return the last match (most recent/relevant)
-                context, sub_goal, tool_name = matches[-1]
-                context = context.strip()
-                sub_goal = sub_goal.strip()
+                if matches:
+                    context, sub_goal, tool_name = matches[-1]
+                    context = context.strip()
+                    sub_goal = sub_goal.strip()
+                else:
+                    # Fallback: extract each field individually
+                    context_m = re.search(r"Context:\s*(.+?)(?=\n\s*Sub[- ]?Goal:|\n\s*Tool|\Z)", text, re.DOTALL | re.IGNORECASE)
+                    subgoal_m = re.search(r"Sub[- ]?Goal:\s*(.+?)(?=\n\s*Tool|\Z)", text, re.DOTALL | re.IGNORECASE)
+                    tool_m = re.search(r"Tool(?:\s*Name)?:\s*(.+?)(?=\n\n|\n\s*$|\Z)", text, re.DOTALL | re.IGNORECASE)
+
+                    context = context_m.group(1).strip() if context_m else ""
+                    sub_goal = subgoal_m.group(1).strip() if subgoal_m else ""
+                    tool_name = tool_m.group(1).strip().split("\n")[0].strip() if tool_m else ""
+
+                    if not tool_name:
+                        print(f"Could not extract tool name from response:\n{text[-300:]}")
+                        return None, None, None
+
             tool_name = normalize_tool_name(tool_name)
         except Exception as e:
             print(f"Error extracting context, sub-goal, and tool name: {str(e)}")
@@ -199,7 +247,7 @@ Tool Metadata:
 {self.toolbox_metadata}
 
 Previous Steps and Their Results:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=512)}
 
 Current Step: {step_count} in {max_step_count} steps
 Remaining Steps: {max_step_count - step_count}
@@ -263,7 +311,7 @@ Context:
 - **Query Analysis:** {query_analysis}
 - **Available Tools:** {self.available_tools}
 - **Toolbox Metadata:** {self.toolbox_metadata}
-- **Previous Steps:** {memory.get_actions()}
+- **Previous Steps:** {memory.get_actions(max_chars_per_result=512)}
 
 Instructions:
 1. Analyze the query, previous steps, and available tools.
@@ -301,40 +349,12 @@ Context:
 Query: {question}
 Image: {image_info}
 Actions Taken:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=512)}
 
-Instructions:
-1. Review the query, image, and all actions taken during the process.
-2. Consider the results obtained from each tool execution.
-3. Incorporate the relevant information from the memory to generate the step-by-step final output.
-4. The final output should be consistent and coherent using the results from the tools.
-
-Output Structure:
-Your response should be well-organized and include the following sections:
-
-1. Summary:
-   - Provide a brief overview of the query and the main findings.
-
-2. Detailed Analysis:
-   - Break down the process of answering the query step-by-step.
-   - For each step, mention the tool used, its purpose, and the key results obtained.
-   - Explain how each step contributed to addressing the query.
-
-3. Key Findings:
-   - List the most important discoveries or insights gained from the analysis.
-   - Highlight any unexpected or particularly interesting results.
-
-4. Answer to the Query:
-   - Directly address the original question with a clear and concise answer.
-   - If the query has multiple parts, ensure each part is answered separately.
-
-5. Additional Insights (if applicable):
-   - Provide any relevant information or insights that go beyond the direct answer to the query.
-   - Discuss any limitations or areas of uncertainty in the analysis.
-
-6. Conclusion:
-   - Summarize the main points and reinforce the answer to the query.
-   - If appropriate, suggest potential next steps or areas for further investigation.
+Your response should be in the following format:
+Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
+Exact Answer: {{your succinct, final answer}}
+Confidence: {{your confidence score between 0% and 100% for your answer}}
 """
         else:
                 prompt_generate_final_output = f"""
@@ -342,11 +362,12 @@ Task: Generate the final output based on the query and the results from all tool
 
 Context:
 - **Query:** {question}
-- **Actions Taken:** {memory.get_actions()}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=512)}
 
-Instructions:
-1. Review the query and the results from all tool executions.
-2. Incorporate the relevant information to create a coherent, step-by-step final output.
+Your response should be in the following format:
+Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
+Exact Answer: {{your succinct, final answer}}
+Confidence: {{your confidence score between 0% and 100% for your answer}}
 """
 
         input_data = [prompt_generate_final_output]
@@ -375,7 +396,7 @@ Image: {image_info}
 Initial Analysis:
 {self.query_analysis}
 Actions Taken:
-{memory.get_actions()}
+{memory.get_actions(max_chars_per_result=512)}
 
 Please generate the concise output based on the query, image information, initial analysis, and actions taken. Break down the process into clear, logical, and conherent steps. Conclude with a precise and direct answer to the query.
 
@@ -388,7 +409,7 @@ Task: Generate a concise final answer to the query based on all provided context
 Context:
 - **Query:** {question}
 - **Initial Analysis:** {self.query_analysis}
-- **Actions Taken:** {memory.get_actions()}
+- **Actions Taken:** {memory.get_actions(max_chars_per_result=512)}
 
 Instructions:
 1. Review the query and the results from all actions.

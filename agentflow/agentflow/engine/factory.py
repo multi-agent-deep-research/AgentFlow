@@ -19,6 +19,52 @@ def create_llm_engine(model_string: str, use_cache: bool = False, is_multimodal:
 
     print(f"creating llm engine {model_string} with: is_multimodal: {is_multimodal}, kwargs: {kwargs}")
 
+    # === Prefix-based routing (check first to avoid false matches below) ===
+
+    # === vLLM ===
+    if model_string.startswith("vllm"):
+        from .vllm import ChatVLLM
+
+        model_string = model_string.replace("vllm-", "")
+        config = {
+            "model_string": model_string,
+            "base_url": kwargs.get("base_url", "http://localhost:8000/v1"),
+            "use_cache": use_cache,
+            "is_multimodal": is_multimodal,
+            "temperature": kwargs.get("temperature", 0.7),
+            "top_p": kwargs.get("top_p", 0.9),
+            "frequency_penalty": kwargs.get("frequency_penalty", 1.2),
+            "max_model_len": kwargs.get("max_model_len", 15200),
+            "max_seq_len_to_capture": kwargs.get("max_seq_len_to_capture", 15200),
+        }
+        print("serving ")
+        return ChatVLLM(**config)
+
+    # === LiteLLM ===
+    if model_string.startswith("litellm"):
+        from .litellm import ChatLiteLLM
+
+        model_string = model_string.replace("litellm-", "")
+        config = {
+            "model_string": model_string,
+            "use_cache": use_cache,
+            "is_multimodal": is_multimodal,
+            "temperature": kwargs.get("temperature", 0.7),
+            "top_p": kwargs.get("top_p", 0.9),
+            "frequency_penalty": kwargs.get("frequency_penalty", 0.5),
+            "presence_penalty": kwargs.get("presence_penalty", 0.5),
+        }
+        if "max_output_tokens" in kwargs:
+            config["max_tokens"] = kwargs["max_output_tokens"]
+        if "extra_body" in kwargs:
+            config["extra_body"] = kwargs["extra_body"]
+        # Auto-disable thinking mode for Qwen3 models to prevent <think> tags in output
+        if "qwen3" in model_string.lower() or "qwen/qwen3" in model_string.lower():
+            existing = config.get("extra_body", {})
+            existing.setdefault("chat_template_kwargs", {}).setdefault("enable_thinking", False)
+            config["extra_body"] = existing
+        return ChatLiteLLM(**config)
+
     # === Azure OpenAI ===
     if "azure" in model_string:
         from .azure import ChatAzureOpenAI
@@ -133,42 +179,6 @@ def create_llm_engine(model_string: str, use_cache: bool = False, is_multimodal:
             "repetition_penalty": kwargs.get("repetition_penalty", 1.2),
         }
         return ChatGrok(**config)
-
-    # === vLLM ===
-    elif "vllm" in model_string:
-        from .vllm import ChatVLLM
-
-        model_string = model_string.replace("vllm-", "")
-        config = {
-            "model_string": model_string,
-            "base_url": kwargs.get("base_url", "http://localhost:8000/v1"), # TODO: check the RL training initialized port and name
-            "use_cache": use_cache,
-            "is_multimodal": is_multimodal,
-            "temperature": kwargs.get("temperature", 0.7),
-            "top_p": kwargs.get("top_p", 0.9),
-            "frequency_penalty": kwargs.get("frequency_penalty", 1.2),
-            "max_model_len": kwargs.get("max_model_len", 15200),
-            "max_seq_len_to_capture": kwargs.get("max_seq_len_to_capture", 15200),
-        }
-        print("serving ")
-        return ChatVLLM(**config)
-
-    # === LiteLLM ===
-    elif "litellm" in model_string:
-        from .litellm import ChatLiteLLM
-
-        model_string = model_string.replace("litellm-", "")
-        # LiteLLM supports frequency/presence_penalty as routing params
-        config = {
-            "model_string": model_string,
-            "use_cache": use_cache,
-            "is_multimodal": is_multimodal,
-            "temperature": kwargs.get("temperature", 0.7),
-            "top_p": kwargs.get("top_p", 0.9),
-            "frequency_penalty": kwargs.get("frequency_penalty", 0.5),
-            "presence_penalty": kwargs.get("presence_penalty", 0.5),
-        }
-        return ChatLiteLLM(**config)
 
     # === Together AI ===
     elif "together" in model_string:
