@@ -80,11 +80,13 @@ def test_faiss_search(index_path):
         args = Namespace(
             index_path=glob_pattern,
             model_name=model_name,
-            normalize=False,
+            normalize=True,
             pooling="eos",
             torch_dtype="float16",
             dataset_name="Tevatron/browsecomp-plus-corpus",
-            max_length=8192
+            task_prefix="Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+            max_length=8192,
+            gpu_id=None,
         )
         searcher = FaissSearcher(args)
 
