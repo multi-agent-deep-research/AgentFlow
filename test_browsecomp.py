@@ -165,24 +165,46 @@ if __name__ == "__main__":
     results.append(("Queries", test_query_loading()))
 
     if not args.no_search:
-        if args.index_type == "all":
-            # Test BM25
-            index_path = str(Path(__file__).parent / "BrowseComp-Plus/indexes/bm25")
-            print(f"\n--- BM25 Search Test ---")
-            results.append(("BM25 Search", test_bm25_search(index_path)))
+        # Auto-detect BrowseComp-Plus indexes directory
+        # Check: inside AgentFlow, sibling to AgentFlow, or env var
+        script_dir = Path(__file__).parent
+        candidates = [
+            Path(os.environ.get("BROWSECOMP_INDEX_PATH", "")).parent if os.environ.get("BROWSECOMP_INDEX_PATH") else None,
+            script_dir / "BrowseComp-Plus" / "indexes",        # inside AgentFlow
+            script_dir.parent / "BrowseComp-Plus" / "indexes", # sibling to AgentFlow
+        ]
+        indexes_dir = None
+        for c in candidates:
+            if c and c.is_dir():
+                indexes_dir = c
+                break
 
-            # Test FAISS (use the smallest one - 0.6b)
-            index_path = str(Path(__file__).parent / "BrowseComp-Plus/indexes/qwen3-embedding-0.6b")
-            print(f"\n--- FAISS Search Test ---")
-            results.append(("FAISS Search", test_faiss_search(index_path)))
-        elif args.index_type == "bm25":
-            index_path = str(Path(__file__).parent / "BrowseComp-Plus/indexes/bm25")
-            print(f"\n--- BM25 Search Test ---")
-            results.append(("BM25 Search", test_bm25_search(index_path)))
-        else:  # faiss
-            index_path = str(Path(__file__).parent / "BrowseComp-Plus/indexes/qwen3-embedding-0.6b")
-            print(f"\n--- FAISS Search Test ---")
-            results.append(("FAISS Search", test_faiss_search(index_path)))
+        if indexes_dir is None:
+            print("\n✗ Could not find BrowseComp-Plus/indexes directory.")
+            print("  Set BROWSECOMP_INDEX_PATH or place BrowseComp-Plus next to AgentFlow.")
+            results.append(("Index Discovery", False))
+        else:
+            print(f"\nUsing indexes at: {indexes_dir}")
+
+            if args.index_type in ("all", "bm25"):
+                bm25_path = str(indexes_dir / "bm25")
+                print(f"\n--- BM25 Search Test ---")
+                results.append(("BM25 Search", test_bm25_search(bm25_path)))
+
+            if args.index_type in ("all", "faiss"):
+                # Auto-detect FAISS index (prefer 8b > 4b > 0.6b)
+                faiss_path = None
+                for name in ["qwen3-embedding-8b", "qwen3-embedding-4b", "qwen3-embedding-0.6b"]:
+                    candidate = indexes_dir / name
+                    if candidate.is_dir():
+                        faiss_path = str(candidate)
+                        break
+                if faiss_path:
+                    print(f"\n--- FAISS Search Test ---")
+                    results.append(("FAISS Search", test_faiss_search(faiss_path)))
+                else:
+                    print("\n✗ No FAISS index found in", indexes_dir)
+                    results.append(("FAISS Search", False))
 
     # Summary
     print("\n" + "=" * 60)
