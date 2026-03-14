@@ -4,6 +4,8 @@
 # Core dependencies
 datasets>=4.0.0
 tqdm>=4.67.1
+wandb
+python-dotenv
 
 # For BM25 search (requires Java JDK 21)
 pyserini>=0.39.0
@@ -15,17 +17,12 @@ faiss-cpu>=1.13.0
 # faiss-gpu>=1.13.0
 
 # Additional dependencies required by BrowseComp-Plus searchers
-# tevatron - for FAISS-based dense retrieval
-# qwen-omni-utils - Qwen model utilities
-# peft - Parameter-Efficient Fine-Tuning (required by tevatron)
-# accelerate - Model acceleration (required by tevatron)
-
-# Install tevatron from git (latest version):
-# uv pip install git+https://github.com/texttron/tevatron.git
-
-# Install qwen-omni-utils:
-# uv pip install qwen-omni-utils
-
-# These will be installed automatically as dependencies:
 peft>=0.18.0
 accelerate>=0.12.0
+
+# Install these separately after requirements-browsecomp.txt:
+#   uv pip install git+https://github.com/texttron/tevatron.git
+#   uv pip install qwen-omni-utils
+#
+# Do NOT install the PyPI "searcher" package — it conflicts with
+# BrowseComp-Plus's local searcher module.

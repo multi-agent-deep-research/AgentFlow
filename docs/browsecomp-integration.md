@@ -113,32 +113,60 @@ uv pip install faiss-gpu>=1.13.0
 
 ## Quick Start
 
-### 1. Clone BrowseComp-Plus and Download Indexes
+### 1. Clone AgentFlow and Set Up Base Environment
+
+```bash
+git clone https://github.com/multi-agent-deep-research/AgentFlow.git
+cd AgentFlow
+bash setup.sh
+source .venv/bin/activate
+git checkout feature/browsecomp-integration
+```
+
+### 2. Install BrowseComp Dependencies
+
+```bash
+# Core BrowseComp dependencies
+uv pip install -r requirements-browsecomp.txt
+
+# Additional required packages (not in base setup)
+uv pip install wandb python-dotenv
+uv pip install git+https://github.com/texttron/tevatron.git
+uv pip install qwen-omni-utils
+
+# Install Java JDK 21 for BM25 search
+sudo apt update && sudo apt install -y openjdk-21-jdk
+# Or: conda install -c conda-forge openjdk=21
+
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64  # adjust for your system
+```
+
+> **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
+> BrowseComp-Plus repository and is loaded automatically via `sys.path`. The PyPI
+> `searcher` package is a completely different project and will cause import errors.
+
+### 3. Clone BrowseComp-Plus and Download Indexes
 
 ```bash
 # Clone BrowseComp-Plus repository (sibling to AgentFlow)
-cd /path/to/parent/dir
+cd ..
 git clone https://github.com/texttron/BrowseComp-Plus.git
 
 # Download pre-built indexes
 cd BrowseComp-Plus
 bash scripts_build_index/download_indexes.sh
+cd ../AgentFlow
 ```
 
-### 2. Install Dependencies
+### 4. Set Environment Variables
 
 ```bash
-# Using uv (recommended for AgentFlow)
-uv pip install -r requirements-browsecomp.txt
-
-# Or with pip
-pip install -r requirements-browsecomp.txt
-
-# Install Java JDK 21 for BM25 search
-conda install -c conda-forge openjdk=21
+export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/bm25
+export BROWSECOMP_INDEX_TYPE=bm25
+# export DEEPINFRA_API_KEY=your_key   # for eval
 ```
 
-### 3. Run the Demo Script
+### 5. Run the Demo Script
 
 The easiest way to see BrowseComp-Plus in action with AgentFlow:
 
@@ -167,7 +195,7 @@ Query: What is the capital of France?
 The capital of France is Paris.
 ```
 
-### 4. Run Tests
+### 6. Run Tests
 
 ```bash
 # Test everything (dataset + BM25 + FAISS)
@@ -183,7 +211,7 @@ python test_browsecomp.py --index-type bm25
 python test_browsecomp.py --index-type faiss
 ```
 
-### 5. Use BrowseComp Search as a Standalone Tool
+### 7. Use BrowseComp Search as a Standalone Tool
 
 ```python
 from agentflow.tools.browsecomp_search import BrowseComp_Search_Tool
