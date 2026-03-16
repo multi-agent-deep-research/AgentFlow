@@ -237,8 +237,10 @@ class BrowseComp_Search_Tool(BaseTool):
             try:
                 import flash_attn
                 attn_impl = "flash_attention_2"
-            except ImportError:
+            except (ImportError, OSError):
                 attn_impl = "eager"
+                import transformers
+                transformers.utils.is_flash_attn_2_available = lambda: False
 
             args = Namespace(
                 index_path=self.index_path,

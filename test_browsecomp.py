@@ -84,8 +84,11 @@ def test_faiss_search(index_path):
         try:
             import flash_attn
             attn_impl = "flash_attention_2"
-        except ImportError:
+        except (ImportError, OSError):
             attn_impl = "eager"
+            # Force transformers to not auto-select flash_attention_2
+            import transformers
+            transformers.utils.is_flash_attn_2_available = lambda: False
 
         args = Namespace(
             index_path=glob_pattern,
