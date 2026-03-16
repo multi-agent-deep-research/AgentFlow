@@ -143,7 +143,8 @@ sudo apt update && sudo apt install -y openjdk-21-jdk
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64  # adjust for your system
 
 # Install flash-attn for FAISS search (requires CUDA toolkit)
-uv pip install flash-attn --no-build-isolation
+# If you get "undefined symbol" errors, add --force-reinstall to rebuild against your PyTorch version
+uv pip install flash-attn --no-build-isolation --force-reinstall
 ```
 
 > **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
