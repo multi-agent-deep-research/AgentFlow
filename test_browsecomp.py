@@ -23,6 +23,13 @@ for candidate in [script_dir / "BrowseComp-Plus", script_dir.parent / "BrowseCom
         sys.path.insert(0, str(candidate))
         break
 
+# Disable flash-attn auto-detection if not available (must be before any transformers import)
+try:
+    import flash_attn
+except (ImportError, OSError):
+    import transformers.utils
+    transformers.utils.is_flash_attn_2_available = lambda: False
+
 from datasets import load_dataset
 
 def test_bm25_search(index_path):
@@ -86,9 +93,6 @@ def test_faiss_search(index_path):
             attn_impl = "flash_attention_2"
         except (ImportError, OSError):
             attn_impl = "eager"
-            # Force transformers to not auto-select flash_attention_2
-            import transformers
-            transformers.utils.is_flash_attn_2_available = lambda: False
 
         args = Namespace(
             index_path=glob_pattern,

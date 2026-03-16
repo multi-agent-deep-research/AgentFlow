@@ -28,6 +28,13 @@ from dotenv import load_dotenv
 from agentflow.tools.base import BaseTool
 from agentflow.engine.factory import create_llm_engine
 
+# Disable flash-attn auto-detection if not available (must be before model loading)
+try:
+    import flash_attn
+except (ImportError, OSError):
+    import transformers.utils
+    transformers.utils.is_flash_attn_2_available = lambda: False
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -239,8 +246,6 @@ class BrowseComp_Search_Tool(BaseTool):
                 attn_impl = "flash_attention_2"
             except (ImportError, OSError):
                 attn_impl = "eager"
-                import transformers
-                transformers.utils.is_flash_attn_2_available = lambda: False
 
             args = Namespace(
                 index_path=self.index_path,
