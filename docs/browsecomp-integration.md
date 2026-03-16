@@ -142,10 +142,9 @@ uv pip install qwen-omni-utils
 sudo apt update && sudo apt install -y openjdk-21-jdk
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64  # adjust for your system
 
-# Install flash-attn for FAISS search (requires CUDA toolkit)
-uv pip install flash-attn --no-build-isolation
-# flash-attn may break torch/transformers dependencies — fix with:
-# uv pip install -U torch torchvision transformers
+# Install flash-attn for FAISS search (requires CUDA toolkit, ~10 min build)
+uv pip install pip  # needed for source build
+python -m pip install flash-attn --no-build-isolation --force-reinstall --no-cache-dir --no-binary :all:
 ```
 
 > **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
