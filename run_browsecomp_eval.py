@@ -440,6 +440,15 @@ def run_evaluation(
             api_key=os.environ.get("OPENROUTER_API_KEY", ""),
         )
         print(f"Judge: {judge_model} via OpenRouter")
+    elif service == "hosted_vllm":
+        hosted_vllm_base = os.environ.get("HOSTED_VLLM_API_BASE", "http://localhost:8001/v1")
+        if judge_model == "openai/gpt-4.1":
+            judge_model = model  # use same model for judging
+        judge_client = _openai.OpenAI(
+            base_url=hosted_vllm_base,
+            api_key=os.environ.get("HOSTED_VLLM_API_KEY", "dummy"),
+        )
+        print(f"Judge: {judge_model} via local vLLM @ {hosted_vllm_base}")
 
     # Run evaluation
     results = []
@@ -673,9 +682,9 @@ def main():
     )
     parser.add_argument(
         "--service",
-        choices=["deepinfra", "openrouter"],
+        choices=["deepinfra", "openrouter", "hosted_vllm"],
         default="openrouter",
-        help="API service for non-planner components (default: openrouter)"
+        help="API service for non-planner components (default: openrouter). Use 'hosted_vllm' for local vLLM (set HOSTED_VLLM_API_BASE)"
     )
     parser.add_argument(
         "--model",
