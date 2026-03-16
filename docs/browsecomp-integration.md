@@ -159,6 +159,9 @@ pip install -U "huggingface_hub[cli]"
 cd ..
 git clone https://github.com/texttron/BrowseComp-Plus.git
 
+# Ensure huggingface-cli is available (download script uses it)
+ln -s ~/.local/bin/hf ~/.local/bin/huggingface-cli
+
 # Download pre-built indexes
 cd BrowseComp-Plus
 bash scripts_build_index/download_indexes.sh
