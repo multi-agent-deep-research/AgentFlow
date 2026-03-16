@@ -317,6 +317,9 @@ source .venv/bin/activate
 export CUDA_HOME=$HOME/cuda-12.8  # if installed locally
 export PATH=$CUDA_HOME/bin:$PATH
 
+# If vLLM crashes with "undefined symbol" errors, reinstall to match your torch version:
+# uv pip install vllm --force-reinstall
+
 # Start vLLM on a specific GPU (adjust GPU index and memory utilization as needed)
 CUDA_VISIBLE_DEVICES=3 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.3
 ```
