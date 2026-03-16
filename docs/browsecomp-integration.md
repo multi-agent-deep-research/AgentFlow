@@ -141,11 +141,30 @@ uv pip install qwen-omni-utils
 # Install Java JDK 21 for BM25 search
 sudo apt update && sudo apt install -y openjdk-21-jdk
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64  # adjust for your system
+```
 
-# Optional: install flash-attn for faster FAISS search (requires CUDA toolkit, ~10 min build)
-# FAISS works without it (falls back to eager attention automatically)
-# uv pip install pip
-# python -m pip install flash-attn --no-build-isolation --no-binary flash-attn
+#### CUDA / flash-attn Setup (for FAISS search)
+
+torch, torchvision, and flash-attn must all be compiled for the **same CUDA version**.
+The base setup uses CUDA 12.8. Check your versions with `python check_env.py`.
+
+```bash
+# 1. Ensure CUDA 12.8 toolkit is available
+#    If not installed system-wide, install to home dir (no sudo needed, ~4.5 GB):
+#    wget https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_570.86.10_linux.run
+#    sh cuda_12.8.0_570.86.10_linux.run --toolkit --silent --toolkitpath=$HOME/cuda-12.8 --override
+export CUDA_HOME=$HOME/cuda-12.8  # or /usr/local/cuda-12.8
+export PATH=$CUDA_HOME/bin:$PATH
+
+# 2. Install torch + torchvision for cu128 (if not already from setup.sh)
+uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
+# 3. Build flash-attn from source (~10 min, must match torch CUDA version)
+uv pip install pip  # needed for source build
+python -m pip install flash-attn --no-build-isolation --no-binary flash-attn --no-cache-dir
+
+# 4. Verify everything matches
+python check_env.py
 ```
 
 > **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
