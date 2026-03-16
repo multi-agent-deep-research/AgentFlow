@@ -80,6 +80,13 @@ def test_faiss_search(index_path):
         else:
             model_name = "Qwen/Qwen3-Embedding-0.6B"  # default
 
+        # Use eager attention if flash-attn is not available
+        try:
+            import flash_attn
+            attn_impl = "flash_attention_2"
+        except ImportError:
+            attn_impl = "eager"
+
         args = Namespace(
             index_path=glob_pattern,
             model_name=model_name,
@@ -90,6 +97,7 @@ def test_faiss_search(index_path):
             task_prefix="Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
             max_length=8192,
             gpu_id=None,
+            attn_implementation=attn_impl,
         )
         searcher = FaissSearcher(args)
 

@@ -233,6 +233,13 @@ class BrowseComp_Search_Tool(BaseTool):
             model_name = os.getenv("BROWSECOMP_MODEL_NAME", "Qwen/Qwen3-Embedding-8B")
             normalize = os.getenv("BROWSECOMP_NORMALIZE", "true").lower() == "true"
 
+            # Use eager attention if flash-attn is not available
+            try:
+                import flash_attn
+                attn_impl = "flash_attention_2"
+            except ImportError:
+                attn_impl = "eager"
+
             args = Namespace(
                 index_path=self.index_path,
                 model_name=model_name,
@@ -243,6 +250,7 @@ class BrowseComp_Search_Tool(BaseTool):
                 task_prefix="Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
                 max_length=8192,
                 gpu_id=None,
+                attn_implementation=attn_impl,
             )
             from searcher.searchers.faiss_searcher import FaissSearcher
             return FaissSearcher(args)
