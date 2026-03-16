@@ -310,9 +310,15 @@ Each query contains:
 
 This is the recommended mode. The fine-tuned planner runs locally via vLLM, while the executor, verifier, generator, and search summarizer use an API model.
 
-**Step 1: Start the vLLM planner server** (on GPU 1):
+**Step 1: Start the vLLM planner server** (pick a free GPU):
 ```bash
-CUDA_VISIBLE_DEVICES=1 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.9
+cd ~/AgentFlow
+source .venv/bin/activate
+export CUDA_HOME=$HOME/cuda-12.8  # if installed locally
+export PATH=$CUDA_HOME/bin:$PATH
+
+# Start vLLM on a specific GPU (adjust GPU index and memory utilization as needed)
+CUDA_VISIBLE_DEVICES=3 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.3
 ```
 
 Wait until you see `Application startup complete`, or check with:
@@ -320,9 +326,14 @@ Wait until you see `Application startup complete`, or check with:
 curl -s http://localhost:8000/v1/models
 ```
 
-**Step 2: Run the evaluation** (FAISS searcher on GPU 0):
+**Step 2: Run the evaluation** (in a separate terminal, pick a different GPU for FAISS):
 ```bash
-CUDA_VISIBLE_DEVICES=0 python run_browsecomp_eval.py \
+cd ~/AgentFlow
+source .venv/bin/activate
+export CUDA_HOME=$HOME/cuda-12.8
+export PATH=$CUDA_HOME/bin:$PATH
+
+CUDA_VISIBLE_DEVICES=2 python run_browsecomp_eval.py \
     --service deepinfra \
     --model Qwen/Qwen3-14B \
     --num-queries 50 \
