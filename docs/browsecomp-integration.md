@@ -321,7 +321,10 @@ export PATH=$CUDA_HOME/bin:$PATH
 # uv pip install vllm --force-reinstall
 
 # Start vLLM on a specific GPU (adjust GPU index and memory utilization as needed)
+# Foreground:
 CUDA_VISIBLE_DEVICES=3 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.3
+# Or background:
+nohup bash -c 'CUDA_VISIBLE_DEVICES=3 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.3' > vllm.log 2>&1 &
 ```
 
 Wait until you see `Application startup complete`, or check with:
