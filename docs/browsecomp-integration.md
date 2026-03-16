@@ -81,7 +81,7 @@ Use BrowseComp-Plus queries as training data for Flow-GRPO:
 **Installation:**
 ```bash
 # Install Java JDK 21
-conda install -c conda-forge openjdk=21
+sudo apt update && sudo apt install -y openjdk-21-jdk
 
 # Install Python dependencies
 uv pip install -r requirements-browsecomp.txt
@@ -136,14 +136,17 @@ uv pip install qwen-omni-utils
 
 # Install Java JDK 21 for BM25 search
 sudo apt update && sudo apt install -y openjdk-21-jdk
-# Or: conda install -c conda-forge openjdk=21
-
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64  # adjust for your system
 ```
 
 > **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
 > BrowseComp-Plus repository and is loaded automatically via `sys.path`. The PyPI
 > `searcher` package is a completely different project and will cause import errors.
+
+```bash
+# HuggingFace CLI (needed to download indexes)
+pip install -U "huggingface_hub[cli]"
+```
 
 ### 3. Clone BrowseComp-Plus and Download Indexes
 

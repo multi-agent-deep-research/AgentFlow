@@ -16,9 +16,12 @@ import os
 import argparse
 from pathlib import Path
 
-# Add BrowseComp-Plus to path
-browsecomp_path = Path(__file__).parent / "BrowseComp-Plus"
-sys.path.insert(0, str(browsecomp_path))
+# Add BrowseComp-Plus to path (check inside AgentFlow and sibling directory)
+script_dir = Path(__file__).parent
+for candidate in [script_dir / "BrowseComp-Plus", script_dir.parent / "BrowseComp-Plus"]:
+    if candidate.is_dir():
+        sys.path.insert(0, str(candidate))
+        break
 
 from datasets import load_dataset
 
