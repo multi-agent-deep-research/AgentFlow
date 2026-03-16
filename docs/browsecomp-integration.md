@@ -144,7 +144,7 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64  # adjust for your system
 
 # Install flash-attn for FAISS search (requires CUDA toolkit, ~10 min build)
 uv pip install pip  # needed for source build
-python -m pip install flash-attn --no-build-isolation --force-reinstall --no-cache-dir --no-binary :all:
+python -m pip install flash-attn --no-build-isolation --force-reinstall --no-cache-dir --no-binary flash-attn
 ```
 
 > **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
