@@ -118,6 +118,10 @@ uv pip install faiss-gpu>=1.13.0
 ```bash
 git clone https://github.com/multi-agent-deep-research/AgentFlow.git
 cd AgentFlow
+
+# Ensure uv is in PATH (pip installs it to ~/.local/bin)
+export PATH=$HOME/.local/bin:$PATH
+
 bash setup.sh
 source .venv/bin/activate
 git checkout feature/browsecomp-integration
