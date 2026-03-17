@@ -166,7 +166,8 @@ def judge_single_result(result_obj, judge_client, judge_model="openai/gpt-4.1"):
     is_correct = parsed.get("correct", False)
 
     status = "CORRECT" if is_correct else ("INCORRECT" if parsed["correct"] is not None else "PARSE_ERROR")
-    print(f"  Judge [{query_id}] {status} | extracted: {parsed.get('extracted_final_answer', 'N/A')[:80]} | gold: {gold_answer[:80]}")
+    extracted = parsed.get('extracted_final_answer') or 'N/A'
+    print(f"  Judge [{query_id}] {status} | extracted: {extracted[:80]} | gold: {gold_answer[:80]}")
 
     return {
         "query_id": query_id,
