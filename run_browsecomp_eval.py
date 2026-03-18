@@ -186,7 +186,7 @@ def extract_tool_call_counts(memory):
     """
     counts = defaultdict(int)
     for step_name, action in memory.items():
-        tool_name = action.get("tool_name", "unknown")
+        tool_name = action.get("tool_name") or "unknown"
         if "search" in tool_name.lower():
             counts["search"] += 1
         else:
@@ -198,7 +198,7 @@ def extract_retrieved_docids(memory):
     """Extract all unique docids retrieved by Web_Search_Tool from solver memory."""
     docids = set()
     for step_name, action in memory.items():
-        if "search" not in action.get("tool_name", "").lower():
+        if "search" not in (action.get("tool_name") or "").lower():
             continue
         result_data = action.get("result", "")
         # Result can be a string or list of strings
