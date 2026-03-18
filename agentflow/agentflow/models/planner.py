@@ -366,9 +366,9 @@ Context:
 - **Query:** {question}
 - **Actions Taken:** {memory.get_actions(max_chars_per_result=512)}
 
-Your response should be in the following format:
-Explanation: {{your explanation for your final answer. For this explanation section only, you should cite your evidence documents inline by enclosing their docids in square brackets [] at the end of sentences. For example, [20].}}
-Exact Answer: {{your succinct, final answer}}
+Your response MUST follow this exact format:
+Explanation: {{your explanation for your final answer. Cite evidence documents inline using [docid] at the end of sentences. For example, [20].}}
+Exact Answer: {{ONLY the final answer itself — a name, number, date, or short phrase. No explanations, qualifications, or hedging. Even if uncertain, commit to your best guess.}}
 Confidence: {{your confidence score between 0% and 100% for your answer}}
 """
 
