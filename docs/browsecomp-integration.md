@@ -200,6 +200,11 @@ export BROWSECOMP_INDEX_TYPE=bm25
 # export DEEPINFRA_API_KEY=your_key   # for eval
 ```
 
+> **Important:** `BROWSECOMP_INDEX_PATH` must be set before running eval. Without it,
+> the BrowseComp search tool will fail to load and the agent will run without search,
+> resulting in near-zero accuracy. You'll see this error in the log:
+> `Error instantiating BrowseComp_Search_Tool: index_path must be provided`
+
 ### 5. Run the Demo Script
 
 The easiest way to see BrowseComp-Plus in action with AgentFlow:
