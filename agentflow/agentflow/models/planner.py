@@ -200,6 +200,8 @@ Be biref and precise with insight.
                 text = str(response)
                 # Strip bold markers and backticks
                 text = text.replace("**", "").replace("```", "")
+                # Normalize markdown headers: "### Context\n..." -> "Context: ..."
+                text = re.sub(r'^#{1,4}\s*(Context|Sub[- ]?Goal|Tool(?:\s*Name)?)\s*\n', r'\1: ', text, flags=re.MULTILINE | re.IGNORECASE)
 
                 # Try the combined pattern first (all three fields in sequence)
                 pattern = r"Context:\s*(.*?)Sub[- ]?Goal:\s*(.*?)Tool(?:\s*Name)?:\s*(.*?)\s*(?=\n\n|\Z)"
