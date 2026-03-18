@@ -247,8 +247,13 @@ class BrowseComp_Search_Tool(BaseTool):
             except (ImportError, OSError):
                 attn_impl = "eager"
 
+            # If index_path is a directory, append glob pattern for FAISS shards
+            faiss_index_path = self.index_path
+            if os.path.isdir(faiss_index_path):
+                faiss_index_path = os.path.join(faiss_index_path, "corpus.shard*.pkl")
+
             args = Namespace(
-                index_path=self.index_path,
+                index_path=faiss_index_path,
                 model_name=model_name,
                 normalize=normalize,
                 pooling="eos",
