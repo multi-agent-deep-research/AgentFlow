@@ -472,6 +472,45 @@ python run_browsecomp_eval.py --unified --service hosted_vllm --model Qwen/Qwen3
     --max-steps 20 --output-dir runs/setup_b_qwen35_unified
 ```
 
+#### Setup C: Unified Qwen3.5-9B + parallel workers + external judge
+
+Same as Setup B but with 4 parallel workers and a stronger judge model (Qwen3-32B via DeepInfra).
+Uses the shared embedding server so workers don't need GPU.
+
+```
+GPU 0: Executor+Planner (Qwen3.5-9B, 18GB) + Embeddings (Qwen3-Embedding-8B, 16GB) = ~34GB
+GPU 1: free
+Judge: Qwen3-32B via DeepInfra API
+```
+
+```bash
+# Start servers
+nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3.5-9B --port 8003 --gpu-memory-utilization 0.6' > vllm_qwen35.log 2>&1 &
+nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B --port 8002 --gpu-memory-utilization 0.3' > vllm_embed.log 2>&1 &
+
+# Wait for servers
+for port in 8002 8003; do
+    while ! curl -s http://localhost:$port/v1/models > /dev/null 2>&1; do sleep 5; done
+    echo "Port $port ready"
+done
+
+# Run parallel eval with external judge
+export EMBEDDING_API_BASE=http://localhost:8002/v1
+export HOSTED_VLLM_API_BASE=http://localhost:8003/v1
+export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/qwen3-embedding-8b
+export BROWSECOMP_INDEX_TYPE=faiss
+export DEEPINFRA_API_KEY=your_key
+
+nohup bash run_browsecomp_parallel.sh --workers 4 \
+    --unified --service hosted_vllm --model Qwen/Qwen3.5-9B \
+    --max-steps 20 --output-dir runs/setup_c_parallel \
+    --judge-model Qwen/Qwen3-32B > /dev/null 2>&1 &
+
+# Check progress:
+ls runs/setup_c_parallel/*/worker_*/*.json 2>/dev/null | grep -v summary | grep -v judge | wc -l
+grep 'Running judge accuracy' runs/setup_c_parallel/*/worker_*/eval.log | tail -4
+```
+
 ### GPU Assignment Reference
 
 | Component | Model | VRAM | Port |
