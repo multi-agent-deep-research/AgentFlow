@@ -271,6 +271,7 @@ def run_evaluation(
     unified=False,
     worker_id=0,
     num_workers=1,
+    run_dir=None,
 ):
     """
     Run evaluation on BrowseComp-Plus.
@@ -285,9 +286,14 @@ def run_evaluation(
         judge_model: Model for LLM judge
         unified: If True, use service/model for ALL components including planner
     """
-    # Create timestamped output directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = Path(output_dir) / timestamp
+    # Create output directory
+    if run_dir:
+        # Exact path provided (e.g. by parallel runner)
+        output_path = Path(run_dir)
+        timestamp = output_path.name
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = Path(output_dir) / timestamp
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Save latest timestamp for easy reference
@@ -452,11 +458,21 @@ def run_evaluation(
         hosted_vllm_base = os.environ.get("HOSTED_VLLM_API_BASE", "http://localhost:8001/v1")
         if judge_model == "openai/gpt-4.1":
             judge_model = model  # use same model for judging
-        judge_client = _openai.OpenAI(
-            base_url=hosted_vllm_base,
-            api_key=os.environ.get("HOSTED_VLLM_API_KEY", "dummy"),
-        )
-        print(f"Judge: {judge_model} via local vLLM @ {hosted_vllm_base}")
+
+        # If a non-default judge model is specified and DEEPINFRA_API_KEY is available,
+        # route judge through DeepInfra instead of local vLLM
+        if judge_model != model and os.environ.get("DEEPINFRA_API_KEY"):
+            judge_client = _openai.OpenAI(
+                base_url="https://api.deepinfra.com/v1/openai",
+                api_key=os.environ.get("DEEPINFRA_API_KEY"),
+            )
+            print(f"Judge: {judge_model} via DeepInfra")
+        else:
+            judge_client = _openai.OpenAI(
+                base_url=hosted_vllm_base,
+                api_key=os.environ.get("HOSTED_VLLM_API_KEY", "dummy"),
+            )
+            print(f"Judge: {judge_model} via local vLLM @ {hosted_vllm_base}")
 
     # Run evaluation
     results = []
@@ -739,6 +755,11 @@ def main():
         default=1,
         help="Total number of parallel workers"
     )
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Exact output directory path (skips timestamp creation, used by parallel runner)"
+    )
 
     args = parser.parse_args()
 
@@ -764,6 +785,7 @@ def main():
         unified=args.unified,
         worker_id=args.worker_id,
         num_workers=args.num_workers,
+        run_dir=args.run_dir,
     )
 
 
