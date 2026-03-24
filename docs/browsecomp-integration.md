@@ -11,105 +11,16 @@
 - **830 challenging queries** — Multi-hop, reasoning-intensive questions
 - **Ground truth answers** — Human-verified for accurate evaluation
 
-## How AgentFlow Uses BrowseComp-Plus
+### How AgentFlow Uses BrowseComp-Plus
 
 AgentFlow is a trainable agentic system with specialized modules (Planner, Executor, Verifier, Generator). The BrowseComp-Plus integration serves two purposes:
 
-### 1. As an Evaluation Benchmark
+**1. As an Evaluation Benchmark** — Test how well AgentFlow performs on deep research tasks compared to other systems (OpenAI, Anthropic, Gemini, etc.).
 
-Test how well AgentFlow performs on deep research tasks compared to other systems (OpenAI, Anthropic, Gemini, etc.).
-
-```
-Query: "What learning institution held a 3-day event in 2002?"
-
-┌─────────────────────────────────────────────────────────────┐
-│ AgentFlow                                                  │
-│ ├── Planner: Break down question, search strategy        │
-│ ├── Executor: Use BrowseComp search tool                │
-│ └── Verifier: Cross-check information, final answer       │
-└─────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-            ┌─────────────────────────────────────┐
-            │ BrowseComp-Plus Corpus (100K docs)  │
-            │ • BM25 keyword search              │
-            │ • FAISS semantic search              │
-            └─────────────────────────────────────┘
-```
-
-### 2. As a Training Resource
-
-Use BrowseComp-Plus queries as training data for Flow-GRPO:
+**2. As a Training Resource** — Use BrowseComp-Plus queries as training data for Flow-GRPO:
 - **Reward signal**: Accuracy of final answer
 - **Tool usage**: Retrieval quality metrics
 - **Long-horizon reasoning**: Multi-step planning
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                      AgentFlow System                         │
-│                                                               │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐ │
-│  │ Planner │───▶│ Executor│───▶│ Verifier│───▶│ Generator│ │
-│  └────┬────┘    └────┬────┘    └────┬────┘    └────┬────┘ │
-│       │              │              │              │        │
-│       └──────────────┴──────────────┴──────────────┘        │
-│                          │                               │
-└──────────────────────────┬───────────────────────────────┘
-                           │
-                           ▼
-                ┌────────────────────────────────┐
-                │   BrowseComp-Plus Search Tool   │
-                │  (BM25 or FAISS over 100K docs)  │
-                └────────────────────────────────┘
-```
-
-## Search Options
-
-### BM25 Search (Keyword-based)
-
-**Pros:**
-- Runs on CPU (no GPU required)
-- Fast, lightweight
-- Good for exact keyword matches
-
-**Cons:**
-- Misses semantic matches
-- Requires Java JDK 21
-
-**Installation:**
-```bash
-# Install Java JDK 21
-sudo apt update && sudo apt install -y openjdk-21-jdk
-
-# Install Python dependencies
-uv pip install -r requirements-browsecomp.txt
-
-# Or install manually
-uv pip install pyserini>=0.39.0 faiss-cpu>=1.13.0 peft>=0.18.0 accelerate>=0.12.0
-uv pip install git+https://github.com/texttron/tevatron.git
-```
-
-### FAISS Search (Embedding-based)
-
-**Pros:**
-- Semantic understanding
-- Better for paraphrases/concept queries
-- No Java required
-
-**Cons:**
-- Requires GPU for embedding model
-- More computationally expensive
-
-**Installation:**
-```bash
-# All dependencies from requirements-browsecomp.txt
-uv pip install -r requirements-browsecomp.txt
-
-# For GPU support, replace faiss-cpu with:
-uv pip install faiss-gpu>=1.13.0
-```
 
 ## Quick Start
 
@@ -127,7 +38,7 @@ source .venv/bin/activate
 git checkout feature/browsecomp-integration
 ```
 
-### 2. Install BrowseComp Dependencies
+### 2. Install Dependencies
 
 ```bash
 # Core BrowseComp dependencies
@@ -141,7 +52,14 @@ uv pip install qwen-omni-utils
 # Install Java JDK 21 for BM25 search
 sudo apt update && sudo apt install -y openjdk-21-jdk
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64  # adjust for your system
+
+# HuggingFace CLI (needed to download indexes)
+pip install -U "huggingface_hub[cli]"
 ```
+
+> **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
+> BrowseComp-Plus repository and is loaded automatically via `sys.path`. The PyPI
+> `searcher` package is a completely different project and will cause import errors.
 
 #### CUDA / flash-attn Setup (for FAISS search)
 
@@ -167,13 +85,11 @@ python -m pip install flash-attn --no-build-isolation --no-binary flash-attn --n
 python check_env.py
 ```
 
-> **Warning:** Do NOT run `pip install searcher`. The `searcher` module comes from the
-> BrowseComp-Plus repository and is loaded automatically via `sys.path`. The PyPI
-> `searcher` package is a completely different project and will cause import errors.
+#### For GPU-accelerated FAISS
 
 ```bash
-# HuggingFace CLI (needed to download indexes)
-pip install -U "huggingface_hub[cli]"
+# Replace faiss-cpu with GPU version:
+uv pip install faiss-gpu>=1.13.0
 ```
 
 ### 3. Clone BrowseComp-Plus and Download Indexes
@@ -205,36 +121,7 @@ export BROWSECOMP_INDEX_TYPE=bm25
 > resulting in near-zero accuracy. You'll see this error in the log:
 > `Error instantiating BrowseComp_Search_Tool: index_path must be provided`
 
-### 5. Run the Demo Script
-
-The easiest way to see BrowseComp-Plus in action with AgentFlow:
-
-```bash
-# Set environment variables for the search tool
-export BROWSECOMP_INDEX_PATH=/path/to/BrowseComp-Plus/indexes/bm25
-export BROWSECOMP_INDEX_TYPE=bm25
-
-# Run the quick start demo
-python quick_start_browsecomp.py
-```
-
-**Expected output:**
-```
-======================================================================
-AgentFlow Quick Start with BrowseComp-Plus
-======================================================================
-
-Query: What is the capital of France?
-======================================================================
-
-[Tool]: BrowseComp_Search_Tool
-[Command]: execution = tool.execute(query="capital of France", k=5)
-
-==> 🐙 Final Answer:
-The capital of France is Paris.
-```
-
-### 6. Run Tests
+### 5. Run Tests
 
 ```bash
 # Test everything (dataset + BM25 + FAISS)
@@ -250,53 +137,29 @@ python test_browsecomp.py --index-type bm25
 python test_browsecomp.py --index-type faiss
 ```
 
-### 7. Use BrowseComp Search as a Standalone Tool
+## Search Options
 
-```python
-from agentflow.tools.browsecomp_search import BrowseComp_Search_Tool
+### BM25 Search (Keyword-based)
 
-# Initialize BM25 searcher
-tool = BrowseComp_Search_Tool(
-    index_type="bm25",
-    index_path="BrowseComp-Plus/indexes/bm25",
-    k=5
-)
+**Pros:**
+- Runs on CPU (no GPU required)
+- Fast, lightweight
+- Good for exact keyword matches
 
-# Search for documents
-results = tool.execute("What is the capital of France?")
-print(results)
-```
+**Cons:**
+- Misses semantic matches
+- Requires Java JDK 21
 
-## Dataset Structure
+### FAISS Search (Embedding-based)
 
-| Component | Source | Size |
-|-----------|--------|------|
-| **Corpus** | `Tevatron/browsecomp-plus-corpus` | 100,195 documents |
-| **Queries** | `Tevatron/browsecomp-plus` (encrypted) | 830 queries |
-| **BM25 Index** | Pre-built Lucene index | ~50 MB |
-| **FAISS Index** | Pre-built Qwen3-Embedding indexes | ~4 GB (varies by model size) |
+**Pros:**
+- Semantic understanding
+- Better for paraphrases/concept queries
+- No Java required
 
-### Document Structure
-
-Each document contains:
-```json
-{
-  "docid": "5412",
-  "text": "---\ntitle: Arwa University holds annual cultural activities...\ndate: 2002...\n---",
-  "url": "https://yementimes.com/arwa-university-holds-annual-cultural-activities..."
-}
-```
-
-### Query Structure
-
-Each query contains:
-```json
-{
-  "query_id": "769",
-  "query": "Please tell me the name of the learning institution...",
-  "answer": "Queen Arwa University"
-}
-```
+**Cons:**
+- Requires GPU for embedding model
+- More computationally expensive
 
 ## Running Evaluation
 
@@ -311,9 +174,11 @@ Each query contains:
   export DEEPINFRA_API_KEY=your_key
   ```
 
-### Mode 1: Hybrid (Local Planner + API Model)
+### Single Worker
 
-This is the recommended mode. The fine-tuned planner runs locally via vLLM, while the executor, verifier, generator, and search summarizer use an API model.
+#### Hybrid (Local Planner + API Model)
+
+The fine-tuned planner runs locally via vLLM, while the executor, verifier, generator, and search summarizer use an API model.
 
 **Step 1: Start the vLLM planner server** (pick a free GPU):
 ```bash
@@ -321,9 +186,6 @@ cd ~/AgentFlow
 source .venv/bin/activate
 export CUDA_HOME=$HOME/cuda-12.8  # if installed locally
 export PATH=$CUDA_HOME/bin:$PATH
-
-# If vLLM crashes with "undefined symbol" errors, reinstall to match your torch version:
-# uv pip install vllm --force-reinstall
 
 # Start vLLM on a specific GPU (adjust GPU index and memory utilization as needed)
 # Foreground:
@@ -351,7 +213,7 @@ CUDA_VISIBLE_DEVICES=2 python run_browsecomp_eval.py \
     --max-steps 20
 ```
 
-### Mode 2: Unified (Single API Model for Everything)
+#### Unified (Single API Model for Everything)
 
 No local GPU needed for the planner — all components use the same API model.
 
@@ -364,7 +226,7 @@ python run_browsecomp_eval.py \
     --max-steps 5
 ```
 
-### Mode 3: Parallel (Shared Embedding Server)
+### Parallel Workers
 
 For faster evaluation, run multiple workers sharing a single embedding server.
 Workers don't need GPU — only the embedding server and vLLM LLM servers do.
@@ -401,9 +263,47 @@ Each worker gets a non-overlapping partition of queries (round-robin by `--worke
 No GPU needed per worker — the FAISS index stays on CPU while embeddings are computed
 by the shared vLLM server.
 
-### Example Setups
+### Key Flags
 
-#### Setup A: Fine-tuned planner + Qwen3.5-9B (hybrid)
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--service` | API provider (`deepinfra`, `openrouter`, or `hosted_vllm`) | `openrouter` |
+| `--model` | Model name on the service | `qwen/qwen-2.5-7b-instruct` |
+| `--unified` | Use API model for all components (no vLLM) | `False` |
+| `--num-queries` | Number of queries to evaluate | all (830) |
+| `--max-steps` | Maximum reasoning steps per query | 3 |
+| `--random` | Randomly sample queries instead of first N | `False` |
+| `--judge-model` | Model for LLM-as-judge evaluation | `openai/gpt-4.1` |
+
+### Judge Model
+
+> **Note:** When using `--service hosted_vllm`, the judge defaults to the
+> same local model (e.g. Qwen3.5-9B), which produces high parse error rates (~40%) and
+> unreliable accuracy numbers. For proper evaluation, use a stronger judge model via an API:
+> ```bash
+> # Use DeepSeek-V3 as judge while running agents on local vLLM
+> export DEEPINFRA_API_KEY=your_key
+> python run_browsecomp_eval.py --service hosted_vllm --model Qwen/Qwen3.5-9B \
+>     --judge-model deepseek-ai/DeepSeek-V3
+> ```
+
+### Search Result Summarization
+
+The BrowseComp search tool uses LLM summarization to compress retrieved documents into focused summaries (instead of truncating at 512 characters). This preserves key facts like names, dates, numbers, and DocIDs. The summarization model is the same as `--model`. If summarization fails (e.g., context too long), it falls back to truncated snippets.
+
+### Output
+
+Results are saved to `runs/agentflow/<timestamp>/`:
+- `eval.log` — full execution log
+- `<query_id>.json` — per-query results
+- `judge_results.json` — LLM judge scores
+- `summary.json` — aggregate metrics
+
+Runs are also logged to W&B (`AgentFlow-Pro-Eval-BrowseComp-Plus` project).
+
+## Example Setups
+
+### Setup A: Fine-tuned planner + Qwen3.5-9B (hybrid)
 
 The fine-tuned planner produces cleaner tool calls and is faster. Recommended for best results.
 
@@ -440,7 +340,7 @@ bash run_browsecomp_parallel.sh --workers 4 \
     --max-steps 20 --output-dir runs/setup_a_planner7b_qwen35
 ```
 
-#### Setup B: Qwen3.5-9B for everything (unified)
+### Setup B: Qwen3.5-9B for everything (unified)
 
 Same model for planner + executor. Simpler (2 servers instead of 3) but the planner
 is less reliable at tool selection — may hallucinate tool names.
@@ -472,7 +372,7 @@ python run_browsecomp_eval.py --unified --service hosted_vllm --model Qwen/Qwen3
     --max-steps 20 --output-dir runs/setup_b_qwen35_unified
 ```
 
-#### Setup C: Unified Qwen3.5-9B + parallel workers + external judge
+### Setup C: Unified Qwen3.5-9B + parallel workers + external judge
 
 Same as Setup B but with 4 parallel workers and a stronger judge model (Qwen3-32B via DeepInfra).
 Uses the shared embedding server so workers don't need GPU.
@@ -485,18 +385,18 @@ Judge: Qwen3-32B via DeepInfra API
 
 ```bash
 # Start servers
-nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3.5-9B --port 8003 --gpu-memory-utilization 0.6' > vllm_qwen35.log 2>&1 &
+nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3.5-9B --port 8001 --gpu-memory-utilization 0.6' > vllm_qwen35.log 2>&1 &
 nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B --port 8002 --gpu-memory-utilization 0.3' > vllm_embed.log 2>&1 &
 
 # Wait for servers
-for port in 8002 8003; do
+for port in 8001 8002; do
     while ! curl -s http://localhost:$port/v1/models > /dev/null 2>&1; do sleep 5; done
     echo "Port $port ready"
 done
 
 # Run parallel eval with external judge
 export EMBEDDING_API_BASE=http://localhost:8002/v1
-export HOSTED_VLLM_API_BASE=http://localhost:8003/v1
+export HOSTED_VLLM_API_BASE=http://localhost:8001/v1
 export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/qwen3-embedding-8b
 export BROWSECOMP_INDEX_TYPE=faiss
 export DEEPINFRA_API_KEY=your_key
@@ -519,42 +419,6 @@ grep 'Running judge accuracy' runs/setup_c_parallel/*/worker_*/eval.log | tail -
 | Executor / Planner (unified) | Qwen/Qwen3.5-9B | ~18 GB | 8001 |
 | Embeddings (FAISS search) | Qwen/Qwen3-Embedding-8B | ~16 GB | 8002 |
 | Eval workers | — | No GPU | — |
-
-### Key Flags
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--service` | API provider (`deepinfra` or `openrouter`) | `openrouter` |
-| `--model` | Model name on the service | `qwen/qwen-2.5-7b-instruct` |
-| `--unified` | Use API model for all components (no vLLM) | `False` |
-| `--num-queries` | Number of queries to evaluate | all (830) |
-| `--max-steps` | Maximum reasoning steps per query | 3 |
-| `--random` | Randomly sample queries instead of first N | `False` |
-| `--judge-model` | Model for LLM-as-judge evaluation | `openai/gpt-4.1` |
-
-> **Note on judge model:** When using `--service hosted_vllm`, the judge defaults to the
-> same local model (e.g. Qwen3.5-9B), which produces high parse error rates (~40%) and
-> unreliable accuracy numbers. For proper evaluation, use a stronger judge model via an API:
-> ```bash
-> # Use DeepSeek-V3 as judge while running agents on local vLLM
-> export DEEPINFRA_API_KEY=your_key
-> python run_browsecomp_eval.py --service hosted_vllm --model Qwen/Qwen3.5-9B \
->     --judge-model deepseek-ai/DeepSeek-V3
-> ```
-
-### Search Result Summarization
-
-The BrowseComp search tool uses LLM summarization to compress retrieved documents into focused summaries (instead of truncating at 512 characters). This preserves key facts like names, dates, numbers, and DocIDs. The summarization model is the same as `--model`. If summarization fails (e.g., context too long), it falls back to truncated snippets.
-
-### Output
-
-Results are saved to `runs/agentflow/<timestamp>/`:
-- `eval.log` — full execution log
-- `<query_id>.json` — per-query results
-- `judge_results.json` — LLM judge scores
-- `summary.json` — aggregate metrics
-
-Runs are also logged to W&B (`AgentFlow-Pro-Eval-BrowseComp-Plus` project).
 
 ## Analyzing Results
 
@@ -622,7 +486,97 @@ python analyze_wandb_run.py h4dh79yg --json
 
 When comparing multiple runs, a side-by-side table is printed at the end.
 
-## Evaluation Format
+## Troubleshooting
+
+### flash-attn build issues
+
+- **CUDA version mismatch:** torch, torchvision, and flash-attn must all use the same CUDA version. Run `python check_env.py` to verify. Reinstall torch for the correct CUDA version:
+  ```bash
+  uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+  ```
+- **"undefined symbol" during flash-attn build:** Force a source build with matching CUDA:
+  ```bash
+  export CUDA_HOME=$HOME/cuda-12.8
+  export PATH=$CUDA_HOME/bin:$PATH
+  python -m pip install flash-attn --no-build-isolation --no-binary flash-attn --no-cache-dir
+  ```
+
+### torch/torchvision version mismatch
+
+Ensure both are installed from the same CUDA index:
+```bash
+uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+```
+
+### "No module named searcher"
+
+Do NOT run `pip install searcher`. The `searcher` module comes from the BrowseComp-Plus repository and is loaded automatically via `sys.path`. The PyPI `searcher` package is a completely different project.
+
+### BROWSECOMP_INDEX_PATH not set
+
+Without this variable, the BrowseComp search tool fails to load and the agent runs without search, resulting in near-zero accuracy. Set it before running eval:
+```bash
+export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/bm25
+export BROWSECOMP_INDEX_TYPE=bm25
+```
+
+### vLLM "undefined symbol" errors
+
+Reinstall vLLM to match your torch version:
+```bash
+uv pip install vllm --force-reinstall
+```
+
+### Port already in use
+
+Check what is using a port and kill it if needed:
+```bash
+lsof -i :8000
+kill <PID>
+```
+
+Standard port assignments: 8000=planner, 8001=executor, 8002=embeddings.
+
+### CUDA out of memory
+
+- Lower `--gpu-memory-utilization` on vLLM servers (e.g., from 0.4 to 0.3)
+- Use fewer models per GPU
+- Check `nvidia-smi` for other processes using GPU memory
+
+## Reference
+
+### Dataset Structure
+
+| Component | Source | Size |
+|-----------|--------|------|
+| **Corpus** | `Tevatron/browsecomp-plus-corpus` | 100,195 documents |
+| **Queries** | `Tevatron/browsecomp-plus` (encrypted) | 830 queries |
+| **BM25 Index** | Pre-built Lucene index | ~50 MB |
+| **FAISS Index** | Pre-built Qwen3-Embedding indexes | ~4 GB (varies by model size) |
+
+#### Document Structure
+
+Each document contains:
+```json
+{
+  "docid": "5412",
+  "text": "---\ntitle: Arwa University holds annual cultural activities...\ndate: 2002...\n---",
+  "url": "https://yementimes.com/arwa-university-holds-annual-cultural-activities..."
+}
+```
+
+#### Query Structure
+
+Each query contains:
+```json
+{
+  "query_id": "769",
+  "query": "Please tell me the name of the learning institution...",
+  "answer": "Queen Arwa University"
+}
+```
+
+### Evaluation JSON Format
 
 To evaluate AgentFlow on BrowseComp-Plus, format results as:
 
@@ -643,14 +597,28 @@ To evaluate AgentFlow on BrowseComp-Plus, format results as:
 
 Then use BrowseComp-Plus's evaluation script (LLM-as-a-judge) to score accuracy.
 
-## Why This Matters for AgentFlow
+### Architecture
 
-1. **Reproducible Benchmarking** — Compare AgentFlow against other systems fairly
-2. **Tool Quality Measurement** — Is AgentFlow retrieving the right documents?
-3. **Long-Form Reasoning** — Can AgentFlow synthesize information across multiple sources?
-4. **Training Signal** — Use accuracy as reward for Flow-GRPO optimization
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      AgentFlow System                         │
+│                                                               │
+│  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐ │
+│  │ Planner │───▶│ Executor│───▶│ Verifier│───▶│ Generator│ │
+│  └────┬────┘    └────┬────┘    └────┬────┘    └────┬────┘ │
+│       │              │              │              │        │
+│       └──────────────┴──────────────┴──────────────┘        │
+│                          │                               │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+                           ▼
+                ┌────────────────────────────────┐
+                │   BrowseComp-Plus Search Tool   │
+                │  (BM25 or FAISS over 100K docs)  │
+                └────────────────────────────────┘
+```
 
-## Links
+### Links
 
 - [BrowseComp-Plus Paper](https://arxiv.org/pdf/2508.06600)
 - [BrowseComp-Plus GitHub](https://github.com/texttron/BrowseComp-Plus)
