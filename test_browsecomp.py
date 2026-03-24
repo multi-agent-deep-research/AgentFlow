@@ -23,12 +23,22 @@ for candidate in [script_dir / "BrowseComp-Plus", script_dir.parent / "BrowseCom
         sys.path.insert(0, str(candidate))
         break
 
-# Disable flash-attn auto-detection if not available (must be before any transformers import)
+# Disable flash-attn if not available (must be before any transformers model loading)
 try:
     import flash_attn
 except (ImportError, OSError):
     import transformers.utils
     transformers.utils.is_flash_attn_2_available = lambda: False
+    # Also patch the import check module directly
+    try:
+        import transformers.utils.import_utils
+        transformers.utils.import_utils.is_flash_attn_2_available = lambda: False
+        transformers.utils.import_utils._is_package_available_cache = {
+            **getattr(transformers.utils.import_utils, '_is_package_available_cache', {}),
+            'flash_attn': False,
+        }
+    except Exception:
+        pass
 
 from datasets import load_dataset
 
