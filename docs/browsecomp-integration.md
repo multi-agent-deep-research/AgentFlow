@@ -231,15 +231,30 @@ python run_browsecomp_eval.py \
 For faster evaluation, run multiple workers sharing a single embedding server.
 Workers don't need GPU — only the embedding server and vLLM LLM servers do.
 
-**Step 1: Start the embedding server** (one GPU, once):
+**Step 1: Start the LLM server** (for planner/executor/generator):
 ```bash
-CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B \
-    --port 8002 --task embed \
-    --override-pooler-config '{"pooling_type": "LAST", "normalize": true}' \
-    --gpu-memory-utilization 0.3
+# For unified mode (one model for everything):
+nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3.5-9B --port 8001 --gpu-memory-utilization 0.5' > vllm_llm.log 2>&1 &
+
+# For hybrid mode (separate fine-tuned planner):
+# nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.3' > vllm_planner.log 2>&1 &
+# nohup bash -c 'CUDA_VISIBLE_DEVICES=1 vllm serve Qwen/Qwen3.5-9B --port 8001 --gpu-memory-utilization 0.5' > vllm_llm.log 2>&1 &
 ```
 
-**Step 2: Run parallel eval:**
+**Step 2: Start the embedding server** (for FAISS search):
+```bash
+nohup bash -c 'CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B --port 8002 --gpu-memory-utilization 0.3' > vllm_embed.log 2>&1 &
+```
+
+**Wait for all servers:**
+```bash
+for port in 8001 8002; do
+    while ! curl -s http://localhost:$port/v1/models > /dev/null 2>&1; do sleep 5; done
+    echo "Port $port ready"
+done
+```
+
+**Step 3: Run parallel eval:**
 ```bash
 export EMBEDDING_API_BASE=http://localhost:8002/v1
 export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/qwen3-embedding-8b
