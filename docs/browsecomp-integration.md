@@ -393,14 +393,85 @@ Workers automatically skip completed queries, so they load-balance across the da
 No GPU needed per worker — the FAISS index stays on CPU while embeddings are computed
 by the shared vLLM server.
 
-### GPU Assignment
+### Example Setups
 
-| Component | GPU | Port | How to set |
-|-----------|-----|------|------------|
-| vLLM planner | GPU 3 | 8000 | `CUDA_VISIBLE_DEVICES=3 vllm serve AgentFlow/agentflow-planner-7b --port 8000` |
-| vLLM executor (Qwen3.5-9B) | GPU 6 | 8001 | `CUDA_VISIBLE_DEVICES=6 vllm serve Qwen/Qwen3.5-9B --port 8001` |
-| vLLM embeddings (Qwen3-Embedding-8B) | GPU 0 | 8002 | `CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B --port 8002 --task embed` |
-| Eval workers | No GPU | — | `python run_browsecomp_eval.py ...` (uses `EMBEDDING_API_BASE` for search) |
+#### Setup A: Fine-tuned planner + Qwen3.5-9B (hybrid)
+
+The fine-tuned planner produces cleaner tool calls and is faster. Recommended for best results.
+
+```
+GPU 0: Planner (agentflow-planner-7b, 14GB) + Embeddings (Qwen3-Embedding-8B, 16GB) = ~30GB
+GPU 1: Executor (Qwen3.5-9B, 18GB)
+```
+
+```bash
+# Start servers
+CUDA_VISIBLE_DEVICES=0 vllm serve AgentFlow/agentflow-planner-7b --port 8000 --gpu-memory-utilization 0.3 &
+CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B --port 8002 --task embed \
+    --override-pooler-config '{"pooling_type": "LAST", "normalize": true}' --gpu-memory-utilization 0.35 &
+CUDA_VISIBLE_DEVICES=1 vllm serve Qwen/Qwen3.5-9B --port 8001 --gpu-memory-utilization 0.4 &
+
+# Wait for all servers
+for port in 8000 8001 8002; do
+    while ! curl -s http://localhost:$port/v1/models > /dev/null 2>&1; do sleep 5; done
+    echo "Port $port ready"
+done
+
+# Run eval
+export EMBEDDING_API_BASE=http://localhost:8002/v1
+export HOSTED_VLLM_API_BASE=http://localhost:8001/v1
+export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/qwen3-embedding-8b
+export BROWSECOMP_INDEX_TYPE=faiss
+
+python run_browsecomp_eval.py --service hosted_vllm --model Qwen/Qwen3.5-9B \
+    --max-steps 20 --output-dir runs/setup_a_planner7b_qwen35
+
+# Or parallel (4 workers, no extra GPU needed):
+bash run_browsecomp_parallel.sh --workers 4 \
+    --service hosted_vllm --model Qwen/Qwen3.5-9B \
+    --max-steps 20 --output-dir runs/setup_a_planner7b_qwen35
+```
+
+#### Setup B: Qwen3.5-9B for everything (unified)
+
+Same model for planner + executor. Simpler (2 servers instead of 3) but the planner
+is less reliable at tool selection — may hallucinate tool names.
+
+```
+GPU 0: Executor+Planner (Qwen3.5-9B, 18GB) + Embeddings (Qwen3-Embedding-8B, 16GB) = ~34GB
+GPU 1: free (or use for another experiment)
+```
+
+```bash
+# Start servers
+CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3.5-9B --port 8001 --gpu-memory-utilization 0.4 &
+CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B --port 8002 --task embed \
+    --override-pooler-config '{"pooling_type": "LAST", "normalize": true}' --gpu-memory-utilization 0.35 &
+
+# Wait for servers
+for port in 8001 8002; do
+    while ! curl -s http://localhost:$port/v1/models > /dev/null 2>&1; do sleep 5; done
+    echo "Port $port ready"
+done
+
+# Run eval (--unified uses the same model for planner)
+export EMBEDDING_API_BASE=http://localhost:8002/v1
+export HOSTED_VLLM_API_BASE=http://localhost:8001/v1
+export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/qwen3-embedding-8b
+export BROWSECOMP_INDEX_TYPE=faiss
+
+python run_browsecomp_eval.py --unified --service hosted_vllm --model Qwen/Qwen3.5-9B \
+    --max-steps 20 --output-dir runs/setup_b_qwen35_unified
+```
+
+### GPU Assignment Reference
+
+| Component | Model | VRAM | Port |
+|-----------|-------|------|------|
+| Planner (fine-tuned) | AgentFlow/agentflow-planner-7b | ~14 GB | 8000 |
+| Executor / Planner (unified) | Qwen/Qwen3.5-9B | ~18 GB | 8001 |
+| Embeddings (FAISS search) | Qwen/Qwen3-Embedding-8B | ~16 GB | 8002 |
+| Eval workers | — | No GPU | — |
 
 ### Key Flags
 
