@@ -269,6 +269,8 @@ def run_evaluation(
     random_sample=False,
     seed=42,
     unified=False,
+    worker_id=0,
+    num_workers=1,
 ):
     """
     Run evaluation on BrowseComp-Plus.
@@ -384,6 +386,11 @@ def run_evaluation(
     print("\nLoading queries...")
     queries = load_queries(num_queries, random_sample=random_sample, seed=seed)
     print(f"Loaded {len(queries)} queries (random={random_sample}, seed={seed})")
+
+    # Partition queries across workers (no overlap)
+    if num_workers > 1:
+        queries = [q for i, q in enumerate(queries) if i % num_workers == worker_id]
+        print(f"Worker {worker_id}/{num_workers}: processing {len(queries)} queries")
 
     # Construct solver
     # model_engine: [planner_main, planner_fixed, verifier, executor]
@@ -720,6 +727,18 @@ def main():
         default=42,
         help="Random seed for sampling (default: 42)"
     )
+    parser.add_argument(
+        "--worker-id",
+        type=int,
+        default=0,
+        help="Worker ID for parallel execution (0-indexed)"
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=1,
+        help="Total number of parallel workers"
+    )
 
     args = parser.parse_args()
 
@@ -743,6 +762,8 @@ def main():
         random_sample=args.random,
         seed=args.seed,
         unified=args.unified,
+        worker_id=args.worker_id,
+        num_workers=args.num_workers,
     )
 
 
