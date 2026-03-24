@@ -400,6 +400,72 @@ Results are saved to `runs/agentflow/<timestamp>/`:
 
 Runs are also logged to W&B (`AgentFlow-Pro-Eval-BrowseComp-Plus` project).
 
+## Analyzing Results
+
+Use `analyze_wandb_run.py` to compute statistics from evaluation runs. It works with W&B runs (downloads artifacts automatically) and local result directories.
+
+To download from W&B, add your API key to `.env`:
+```
+WANDB_API_KEY=your_wandb_api_key
+```
+
+### Usage
+
+```bash
+# From a W&B URL
+python analyze_wandb_run.py https://wandb-radfan.ru/multiagent-deepresearch-improvement/AgentFlow-Pro-Eval-BrowseComp-Plus/runs/h4dh79yg/overview
+
+# From a W&B run ID
+python analyze_wandb_run.py h4dh79yg
+
+# From a local results directory
+python analyze_wandb_run.py runs/agentflow_planner7b_qwen35/20260318_144941
+
+# Compare multiple runs side by side
+python analyze_wandb_run.py h4dh79yg abc123de runs/local_dir
+
+# Output as JSON
+python analyze_wandb_run.py h4dh79yg --json
+```
+
+### What it computes
+
+| Category | Metrics |
+|----------|---------|
+| **Queries** | Total, completed, failed, completion rate |
+| **Tool calls** | Avg/median/max per query, search vs generate split, distribution |
+| **Context length** | Avg/median/max in chars and estimated tokens (~4 chars/token) |
+| **Steps** | Avg/median/max reasoning steps per query |
+| **Execution time** | Avg/median per query, total runtime |
+| **Retrieved docs** | Avg per query, total unique DocIDs |
+
+### How it works
+
+1. **W&B runs:** Downloads the `evaluation_results` artifact to `wandb_cache/<run_id>/` (cached — won't re-download on subsequent runs)
+2. **Local dirs:** Reads `<query_id>.json` files directly from the results directory (handles nested timestamp subdirectories automatically)
+3. **Context estimation:** For each query, accumulates the query text + all step sub-goals, commands, and results to estimate the total context window used. Tokens are estimated at ~4 chars/token
+
+### Example output
+
+```
+--- Tool Calls ---
+  Avg per query:  7.7
+  Avg search:     7.2
+  Avg generate:   0.4
+
+--- Context Length ---
+  Avg (chars):    20,136
+  Max (chars):    58,494
+  Avg (~tokens):  5,034
+  Max (~tokens):  14,623
+
+--- Steps ---
+  Avg:            7.7
+  Max:            10
+```
+
+When comparing multiple runs, a side-by-side table is printed at the end.
+
 ## Evaluation Format
 
 To evaluate AgentFlow on BrowseComp-Plus, format results as:
