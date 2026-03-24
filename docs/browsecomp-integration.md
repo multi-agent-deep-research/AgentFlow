@@ -386,6 +386,16 @@ When running in hybrid mode, the vLLM planner and FAISS embedding model need sep
 | `--random` | Randomly sample queries instead of first N | `False` |
 | `--judge-model` | Model for LLM-as-judge evaluation | `openai/gpt-4.1` |
 
+> **Note on judge model:** When using `--service hosted_vllm`, the judge defaults to the
+> same local model (e.g. Qwen3.5-9B), which produces high parse error rates (~40%) and
+> unreliable accuracy numbers. For proper evaluation, use a stronger judge model via an API:
+> ```bash
+> # Use DeepSeek-V3 as judge while running agents on local vLLM
+> export DEEPINFRA_API_KEY=your_key
+> python run_browsecomp_eval.py --service hosted_vllm --model Qwen/Qwen3.5-9B \
+>     --judge-model deepseek-ai/DeepSeek-V3
+> ```
+
 ### Search Result Summarization
 
 The BrowseComp search tool uses LLM summarization to compress retrieved documents into focused summaries (instead of truncating at 512 characters). This preserves key facts like names, dates, numbers, and DocIDs. The summarization model is the same as `--model`. If summarization fails (e.g., context too long), it falls back to truncated snippets.
