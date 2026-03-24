@@ -364,15 +364,43 @@ python run_browsecomp_eval.py \
     --max-steps 5
 ```
 
+### Mode 3: Parallel (Shared Embedding Server)
+
+For faster evaluation, run multiple workers sharing a single embedding server.
+Workers don't need GPU — only the embedding server and vLLM LLM servers do.
+
+**Step 1: Start the embedding server** (one GPU, once):
+```bash
+CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B \
+    --port 8002 --task embed \
+    --override-pooler-config '{"pooling_type": "LAST", "normalize": true}' \
+    --gpu-memory-utilization 0.3
+```
+
+**Step 2: Run parallel eval:**
+```bash
+export EMBEDDING_API_BASE=http://localhost:8002/v1
+export BROWSECOMP_INDEX_PATH=~/BrowseComp-Plus/indexes/qwen3-embedding-8b
+export BROWSECOMP_INDEX_TYPE=faiss
+export HOSTED_VLLM_API_BASE=http://localhost:8001/v1
+
+bash run_browsecomp_parallel.sh --workers 4 \
+    --service hosted_vllm --model Qwen/Qwen3.5-9B \
+    --max-steps 20 --output-dir runs/agentflow_parallel
+```
+
+Workers automatically skip completed queries, so they load-balance across the dataset.
+No GPU needed per worker — the FAISS index stays on CPU while embeddings are computed
+by the shared vLLM server.
+
 ### GPU Assignment
 
-When running in hybrid mode, the vLLM planner and FAISS embedding model need separate GPUs:
-
-| Component | GPU | How to set |
-|-----------|-----|------------|
-| vLLM planner | GPU 1 | `CUDA_VISIBLE_DEVICES=1 vllm serve ...` |
-| FAISS searcher (embedding model) | GPU 0 | `CUDA_VISIBLE_DEVICES=0 python run_browsecomp_eval.py ...` |
-| Executor/Verifier/Generator | API | Via `--service` and `--model` flags |
+| Component | GPU | Port | How to set |
+|-----------|-----|------|------------|
+| vLLM planner | GPU 3 | 8000 | `CUDA_VISIBLE_DEVICES=3 vllm serve AgentFlow/agentflow-planner-7b --port 8000` |
+| vLLM executor (Qwen3.5-9B) | GPU 6 | 8001 | `CUDA_VISIBLE_DEVICES=6 vllm serve Qwen/Qwen3.5-9B --port 8001` |
+| vLLM embeddings (Qwen3-Embedding-8B) | GPU 0 | 8002 | `CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-Embedding-8B --port 8002 --task embed` |
+| Eval workers | No GPU | — | `python run_browsecomp_eval.py ...` (uses `EMBEDDING_API_BASE` for search) |
 
 ### Key Flags
 

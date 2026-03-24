@@ -239,18 +239,32 @@ class BrowseComp_Search_Tool(BaseTool):
         elif self.index_type == "faiss":
             model_name = os.getenv("BROWSECOMP_MODEL_NAME", "Qwen/Qwen3-Embedding-8B")
             normalize = os.getenv("BROWSECOMP_NORMALIZE", "true").lower() == "true"
+            embedding_api_base = os.getenv("EMBEDDING_API_BASE", "")
 
+            # If index_path is a directory, append glob pattern for FAISS shards
+            faiss_index_path = self.index_path
+            if os.path.isdir(faiss_index_path):
+                faiss_index_path = os.path.join(faiss_index_path, "corpus.shard*.pkl")
+
+            # Use remote FAISS searcher if embedding server is configured
+            if embedding_api_base:
+                from agentflow.tools.browsecomp_search.remote_faiss_searcher import RemoteFaissSearcher
+                args = Namespace(
+                    index_path=faiss_index_path,
+                    model_name=model_name,
+                    dataset_name="Tevatron/browsecomp-plus-corpus",
+                    task_prefix="Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+                )
+                print(f"[BrowseComp] Using remote FAISS searcher (embedding server: {embedding_api_base})")
+                return RemoteFaissSearcher(args)
+
+            # Local FAISS searcher (loads embedding model in-process)
             # Use eager attention if flash-attn is not available
             try:
                 import flash_attn
                 attn_impl = "flash_attention_2"
             except (ImportError, OSError):
                 attn_impl = "eager"
-
-            # If index_path is a directory, append glob pattern for FAISS shards
-            faiss_index_path = self.index_path
-            if os.path.isdir(faiss_index_path):
-                faiss_index_path = os.path.join(faiss_index_path, "corpus.shard*.pkl")
 
             args = Namespace(
                 index_path=faiss_index_path,
