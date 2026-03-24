@@ -387,9 +387,17 @@ export HOSTED_VLLM_API_BASE=http://localhost:8001/v1
 bash run_browsecomp_parallel.sh --workers 4 \
     --service hosted_vllm --model Qwen/Qwen3.5-9B \
     --max-steps 20 --output-dir runs/agentflow_parallel
+
+# Or in background:
+nohup bash run_browsecomp_parallel.sh --workers 4 \
+    --service hosted_vllm --model Qwen/Qwen3.5-9B \
+    --max-steps 20 --output-dir runs/agentflow_parallel > /dev/null 2>&1 &
+
+# Check progress:
+ls runs/agentflow_parallel/*/*.json | wc -l
 ```
 
-Workers automatically skip completed queries, so they load-balance across the dataset.
+Each worker gets a non-overlapping partition of queries (round-robin by `--worker-id`).
 No GPU needed per worker — the FAISS index stays on CPU while embeddings are computed
 by the shared vLLM server.
 
