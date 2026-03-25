@@ -14,12 +14,15 @@ class Verifier:
     def __init__(self, llm_engine_name: str, llm_engine_fixed_name: str = "dashscope",
                  toolbox_metadata: dict = None, available_tools: list = None,
                  verbose: bool = False, base_url: str = None, is_multimodal: bool = False,
-                 check_model: bool = True, temperature: float = .0):
+                 check_model: bool = True, temperature: float = .0, max_output_tokens: int = None):
         self.llm_engine_name = llm_engine_name
         self.llm_engine_fixed_name = llm_engine_fixed_name
         self.is_multimodal = is_multimodal
-        self.llm_engine_fixed = create_llm_engine(model_string=llm_engine_fixed_name, is_multimodal=False, temperature=temperature)
-        self.llm_engine = create_llm_engine(model_string=llm_engine_name, is_multimodal=False, base_url=base_url, temperature=temperature)
+        engine_kwargs = dict(is_multimodal=False, temperature=temperature)
+        if max_output_tokens:
+            engine_kwargs["max_output_tokens"] = max_output_tokens
+        self.llm_engine_fixed = create_llm_engine(model_string=llm_engine_fixed_name, **engine_kwargs)
+        self.llm_engine = create_llm_engine(model_string=llm_engine_name, base_url=base_url, **engine_kwargs)
         self.toolbox_metadata = toolbox_metadata if toolbox_metadata is not None else {}
         self.available_tools = available_tools if available_tools is not None else []
         self.verbose = verbose
@@ -51,7 +54,7 @@ Image: {image_info}
 Available Tools: {self.available_tools}
 Toolbox Metadata: {self.toolbox_metadata}
 Initial Analysis: {query_analysis}
-Memory (tools used and results): {memory.get_actions()}
+Memory (tools used and results): {memory.get_actions(max_chars_per_result=512)}
 
 Detailed Instructions:
 1. Carefully analyze the query, initial analysis, and image (if provided):
@@ -112,7 +115,7 @@ Context:
 - **Available Tools:** {self.available_tools}
 - **Toolbox Metadata:** {self.toolbox_metadata}
 - **Initial Analysis:** {query_analysis}
-- **Memory (Tools Used & Results):** {memory.get_actions()}
+- **Memory (Tools Used & Results):** {memory.get_actions(max_chars_per_result=512)}
 
 Instructions:
 1.  Review the query, initial analysis, and memory.
@@ -146,6 +149,8 @@ IMPORTANT: The response must end with either "Conclusion: STOP" or "Conclusion: 
 
     def extract_conclusion(self, response: Any) -> Tuple[str, str]:
         if isinstance(response, str):
+            # Debug: print response info
+            print(f"DEBUG verifier response:\n{response}")
             # Attempt to parse the response as JSON
             try:
                 response_dict = json.loads(response)
