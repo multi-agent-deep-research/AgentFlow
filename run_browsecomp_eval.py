@@ -377,6 +377,12 @@ def run_evaluation(
     sys.stdout = tee
     sys.stderr = tee
 
+    # Log the command used to run this eval
+    print(f"Command: {' '.join(sys.argv)}")
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Timestamp: {timestamp}")
+    print()
+
     # Construct the API model string from service + model
     api_model = f"litellm-{service}/{model}"
 
