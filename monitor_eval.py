@@ -287,24 +287,26 @@ def main():
 
             print_stats(stats, prev_processed)
 
-            # Log to W&B
+            # Log to W&B with total_processed as x-axis
             if wandb_run is not None:
                 import wandb
-                wandb.log({
-                    "total_processed": stats["total_processed"],
-                    "total_completed": stats["total_completed"],
-                    "total_failed": stats["total_failed"],
-                    "completion_rate": stats["completion_rate"],
-                    "judge_correct": stats["judge_correct"],
-                    "judge_accuracy": stats["judge_accuracy"],
-                    "judge_parse_errors": stats["judge_parse_errors"],
-                    "avg_tool_calls": stats["avg_tool_calls"],
-                    "total_search_calls": stats["total_search_calls"],
-                    "total_generate_calls": stats["total_generate_calls"],
-                    "avg_exec_time_s": stats["avg_exec_time_s"],
-                    "median_exec_time_s": stats["median_exec_time_s"],
-                    "avg_steps": stats["avg_steps"],
-                })
+                step = stats["total_processed"]
+                if step > 0 and step != prev_processed:
+                    wandb.log({
+                        "total_processed": step,
+                        "total_completed": stats["total_completed"],
+                        "total_failed": stats["total_failed"],
+                        "completion_rate": stats["completion_rate"],
+                        "judge_correct": stats["judge_correct"],
+                        "judge_accuracy": stats["judge_accuracy"],
+                        "judge_parse_errors": stats["judge_parse_errors"],
+                        "avg_tool_calls": stats["avg_tool_calls"],
+                        "total_search_calls": stats["total_search_calls"],
+                        "total_generate_calls": stats["total_generate_calls"],
+                        "avg_exec_time_s": stats["avg_exec_time_s"],
+                        "median_exec_time_s": stats["median_exec_time_s"],
+                        "avg_steps": stats["avg_steps"],
+                    }, step=step)
 
             prev_processed = stats["total_processed"]
 
