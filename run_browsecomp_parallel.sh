@@ -103,13 +103,43 @@ for i in $(seq 0 $((WORKERS - 1))); do
     sleep 2
 done
 
+# Build config JSON for W&B monitor
+CONFIG_JSON=$(python3 -c "
+import json, sys
+args = sys.argv[1:]
+config = {}
+i = 0
+while i < len(args):
+    if args[i].startswith('--') and i+1 < len(args) and not args[i+1].startswith('--'):
+        config[args[i][2:].replace('-','_')] = args[i+1]
+        i += 2
+    elif args[i].startswith('--'):
+        config[args[i][2:].replace('-','_')] = True
+        i += 1
+    else:
+        i += 1
+config['workers'] = $WORKERS
+print(json.dumps(config))
+" "${EVAL_ARGS[@]}" 2>/dev/null || echo '{}')
+
+# Start W&B monitor
+echo "Starting W&B monitor..."
+python monitor_eval.py \
+    --run-dir "$RUN_DIR" \
+    --interval 60 \
+    --total-queries 830 \
+    --wandb-name "eval_${TIMESTAMP}_${WORKERS}w" \
+    --config "$CONFIG_JSON" > "${RUN_DIR}/monitor.log" 2>&1 &
+MONITOR_PID=$!
+
 echo ""
 echo "All $WORKERS workers started (PIDs: ${PIDS[*]})"
+echo "Monitor started (PID: $MONITOR_PID) -> $RUN_DIR/monitor.log"
 echo "Each worker processes ~$((830 / WORKERS)) queries (non-overlapping partitions)"
 echo ""
 echo "Check progress:"
-echo "  ls $RUN_DIR/worker_*/*.json | wc -l"
-echo "  grep 'Running judge accuracy' $RUN_DIR/worker_*/eval.log | tail -$WORKERS"
+echo "  tail -1 $RUN_DIR/monitor.log"
+echo "  ls $RUN_DIR/worker_*/*.json 2>/dev/null | grep -v summary | grep -v judge | wc -l"
 echo ""
 
 # Wait for all workers
@@ -119,5 +149,12 @@ for pid in "${PIDS[@]}"; do
 done
 
 echo "All workers finished!"
+
+# Give monitor time to pick up final results, then stop it
+sleep 10
+kill "$MONITOR_PID" 2>/dev/null
+wait "$MONITOR_PID" 2>/dev/null || true
+
 echo "Results in: $RUN_DIR"
 echo "Total results: $(ls $RUN_DIR/worker_*/*.json 2>/dev/null | grep -v summary | grep -v judge | wc -l)"
+echo "Monitor log: $RUN_DIR/monitor.log"
