@@ -306,32 +306,27 @@ Remember: Your response MUST end with the Context, Sub-Goal, and Tool Name secti
                         """
         else:
             prompt_generate_next_step = f"""
-Task: Determine the optimal next step to address the query using available tools and previous steps.
+Task: Select one tool and formulate the next step to address the query.
 
-Context:
-- **Query:** {question}
-- **Query Analysis:** {query_analysis}
-- **Available Tools:** {self.available_tools}
-- **Toolbox Metadata:** {self.toolbox_metadata}
-- **Previous Steps:** {memory.get_actions(max_chars_per_result=512)}
+Query: {question}
+Query Analysis: {query_analysis}
+Available Tools: {self.available_tools}
+Tool Metadata: {self.toolbox_metadata}
+Previous Steps: {memory.get_actions(max_chars_per_result=512)}
+Current Step: {step_count}/{max_step_count}
 
 Instructions:
-1. Analyze the query, previous steps, and available tools.
-2. Select the **single best tool** for the next step.
-3. Formulate a specific, achievable **sub-goal** for that tool.
-4. Provide all necessary **context** (data, file names, variables) for the tool to function.
+1. Briefly justify your tool choice (2-3 sentences max).
+2. End your response with EXACTLY these three lines:
 
-Response Format:
-1.  **Justification:** Explain your choice of tool and sub-goal.
-2.  **Context:** Provide all necessary information for the tool.
-3.  **Sub-Goal:** State the specific objective for the tool.
-4.  **Tool Name:** State the exact name of the selected tool.
+Context: <all information the tool needs>
+Sub-Goal: <specific objective for the tool>
+Tool Name: <exact tool name from available tools list>
 
-Rules:
-- Select only ONE tool.
-- The sub-goal must be directly achievable by the selected tool.
-- The Context section must contain all information the tool needs to function.
-- The response must end with the Context, Sub-Goal, and Tool Name sections in that order, with no extra content.
+CRITICAL RULES:
+- Tool Name MUST be one of: {self.available_tools}. Do NOT invent tool names.
+- Your response MUST end with Context, Sub-Goal, and Tool Name. Nothing after Tool Name.
+- Keep your justification SHORT. Do not ramble or repeat yourself.
                     """
             
         next_step = self.llm_engine(prompt_generate_next_step, response_format=NextStep)

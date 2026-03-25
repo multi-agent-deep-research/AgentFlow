@@ -69,6 +69,24 @@ correct: Answer 'yes' if extracted_final_answer matches the [correct_answer] giv
 confidence: The extracted confidence score between 0|%| and 100|%| from [response]. Put 100 if there is no confidence score available.
 """.strip()
 
+GRADER_TEMPLATE_JSON = """
+Judge whether the following [response] to [question] is correct based on the [correct_answer].
+
+[question]: {question}
+
+[response]: {response}
+
+[correct_answer]: {correct_answer}
+
+Respond with a JSON object containing exactly these fields:
+- "extracted_final_answer": the exact final answer extracted from the response (string, or "None" if no answer found)
+- "reasoning": brief explanation of whether the extracted answer matches the correct answer (string)
+- "correct": whether the answer is correct ("yes" or "no")
+- "confidence": the confidence score from the response as a number 0-100 (integer, default 100)
+
+Respond ONLY with the JSON object, no other text.
+""".strip()
+
 
 def parse_judge_response(judge_response):
     """Parse structured judge response into fields."""
@@ -133,7 +151,7 @@ def parse_judge_response(judge_response):
     return result
 
 
-def judge_single_result(result_obj, judge_client, judge_model="openai/gpt-4.1"):
+def judge_single_result(result_obj, judge_client, judge_model="openai/gpt-4.1", use_json_mode=True):
     """Run LLM-as-judge on a single completed result.
 
     Returns:
@@ -147,22 +165,64 @@ def judge_single_result(result_obj, judge_client, judge_model="openai/gpt-4.1"):
     gold_answer = result_obj.get("gold_answer", "")
     query_text = result_obj.get("query_text", "") or "(see response for context)"
 
-    judge_prompt = GRADER_TEMPLATE.format(
-        question=query_text, response=response_text, correct_answer=gold_answer
-    )
+    # Use JSON mode for more reliable parsing
+    if use_json_mode:
+        judge_prompt = GRADER_TEMPLATE_JSON.format(
+            question=query_text, response=response_text, correct_answer=gold_answer
+        )
+    else:
+        judge_prompt = GRADER_TEMPLATE.format(
+            question=query_text, response=response_text, correct_answer=gold_answer
+        )
 
     try:
-        response = judge_client.chat.completions.create(
-            model=judge_model,
-            messages=[{"role": "user", "content": judge_prompt}],
-            max_tokens=1024,
-        )
+        create_kwargs = {
+            "model": judge_model,
+            "messages": [{"role": "user", "content": judge_prompt}],
+            "max_tokens": 1024,
+        }
+        if use_json_mode:
+            create_kwargs["response_format"] = {"type": "json_object"}
+        response = judge_client.chat.completions.create(**create_kwargs)
         judge_text = response.choices[0].message.content or ""
     except Exception as e:
-        print(f"  [{query_id}] Judge error: {e}")
-        judge_text = ""
+        # If JSON mode fails, fall back to text mode
+        if use_json_mode:
+            try:
+                judge_prompt = GRADER_TEMPLATE.format(
+                    question=query_text, response=response_text, correct_answer=gold_answer
+                )
+                response = judge_client.chat.completions.create(
+                    model=judge_model,
+                    messages=[{"role": "user", "content": judge_prompt}],
+                    max_tokens=1024,
+                )
+                judge_text = response.choices[0].message.content or ""
+            except Exception as e2:
+                print(f"  [{query_id}] Judge error: {e2}")
+                judge_text = ""
+        else:
+            print(f"  [{query_id}] Judge error: {e}")
+            judge_text = ""
 
-    parsed = parse_judge_response(judge_text)
+    # Try JSON parse first, then fall back to regex
+    parsed = None
+    if use_json_mode and judge_text.strip():
+        try:
+            j = json.loads(judge_text)
+            parsed = {
+                "extracted_final_answer": j.get("extracted_final_answer"),
+                "reasoning": j.get("reasoning"),
+                "correct": j.get("correct", "").lower() == "yes" if isinstance(j.get("correct"), str) else j.get("correct", False),
+                "confidence": min(float(j.get("confidence", 100)), 100.0),
+                "parse_error": False,
+            }
+        except (json.JSONDecodeError, ValueError, AttributeError):
+            pass
+
+    if parsed is None:
+        parsed = parse_judge_response(judge_text)
+
     is_correct = parsed.get("correct", False)
 
     status = "CORRECT" if is_correct else ("INCORRECT" if parsed["correct"] is not None else "PARSE_ERROR")
