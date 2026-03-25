@@ -329,7 +329,7 @@ CRITICAL RULES:
 - Keep your justification SHORT. Do not ramble or repeat yourself.
                     """
             
-        next_step = self.llm_engine(prompt_generate_next_step, response_format=NextStep)
+        next_step = self.llm_engine(prompt_generate_next_step, response_format=NextStep, max_tokens=1024)
         if json_data is not None:
             json_data[f"action_predictor_{step_count}_prompt"] = prompt_generate_next_step
             json_data[f"action_predictor_{step_count}_response"] = str(next_step)
