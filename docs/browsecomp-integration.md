@@ -435,9 +435,36 @@ grep 'Running judge accuracy' runs/setup_c_parallel/*/worker_*/eval.log | tail -
 | Embeddings (FAISS search) | Qwen/Qwen3-Embedding-8B | ~16 GB | 8002 |
 | Eval workers | — | No GPU | — |
 
+## Monitoring Parallel Runs
+
+Use `monitor_eval.py` to track progress of parallel evaluation in real time. It polls worker directories for new results and logs aggregated metrics (accuracy, tool calls, steps) to a single W&B run.
+
+```bash
+# Start after launching parallel eval (runs in background):
+nohup python monitor_eval.py runs/setup_b_parallel --interval 30 > monitor.log 2>&1 &
+
+# Watch progress:
+tail -f monitor.log
+
+# Without W&B (terminal only):
+python monitor_eval.py runs/setup_b_parallel --no-wandb
+
+# Custom poll interval (seconds):
+python monitor_eval.py runs/setup_b_parallel --interval 15
+```
+
+The monitor prints a compact summary every interval and auto-stops when all 830 queries are done:
+```
+[12:05:30] Processed: 120/830 | Correct: 28/120 (23.3%) | Parse errors: 12 | Avg steps: 8.2 | +15 new
+  worker_0: 32 done, 8/32 correct
+  worker_1: 30 done, 7/30 correct
+  worker_2: 31 done, 8/31 correct
+  worker_3: 27 done, 5/27 correct
+```
+
 ## Analyzing Results
 
-Use `analyze_wandb_run.py` to compute statistics from evaluation runs. It works with W&B runs (downloads artifacts automatically) and local result directories.
+Use `analyze_wandb_run.py` to compute statistics from completed evaluation runs. It works with W&B runs (downloads artifacts automatically) and local result directories.
 
 To download from W&B, add your API key to `.env`:
 ```
